@@ -20,6 +20,12 @@ target/
 node_modules/
 dist/
 .svelte-kit/
+package-lock.json
+
+# identity
+.identity
 
 # environment variables
+canister_ids.json
 .env
+.mops

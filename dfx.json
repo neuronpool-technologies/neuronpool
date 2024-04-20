@@ -1,7 +1,7 @@
 {
   "canisters": {
-    "neuronpool_backend": {
-      "main": "src/neuronpool_backend/main.mo",
+    "NeuronPool": {
+      "main": "src/neuronpool_backend/NeuronPool.mo",
       "type": "motoko"
     },
     "neuronpool_frontend": {
@@ -18,7 +18,7 @@
   "defaults": {
     "build": {
       "args": "",
-      "packtool": ""
+      "packtool": "mops sources"
     }
   },
   "output_env_file": ".env",

@@ -20,7 +20,6 @@ target/
 node_modules/
 dist/
 .svelte-kit/
-package-lock.json
 
 # identity
 .identity

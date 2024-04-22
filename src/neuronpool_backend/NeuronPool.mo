@@ -1,10 +1,10 @@
 import Principal "mo:base/Principal";
 import Blob "mo:base/Blob";
 import Nat64 "mo:base/Nat64";
-import Debug "mo:base/Debug";
 import Option "mo:base/Option";
 import Random "mo:base/Random";
 import Text "mo:base/Text";
+import Result "mo:base/Result";
 import Sha256 "mo:sha2/Sha256";
 import Hex "mo:encoding/Hex";
 import Binary "mo:encoding/Binary";
@@ -35,21 +35,13 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   /// Types ///
   /////////////
 
-  public type CanisterAccountsResult = {
-    account_identifier : Text;
-    icrc1_identifier : Text;
-    balance : Nat;
-  };
+  public type Result<X, Y> = Result.Result<X, Y>;
 
-  public type CanisterLegacyTransferResult = {
-    #Ok : Nat64;
-    #Err : IcpLedgerInterface.TransferError_1;
-  };
+  public type StakeNeuronResult = Result<Nat64, Text>;
 
-  public type CanisterIcrc1TransferResult = {
-    #Ok : Nat;
-    #Err : IcpLedgerInterface.TransferError;
-  };
+  public type IcpStakeTransferResult = Result<(), Text>;
+
+  public type CanisterAccountsResult = Result<{ account_identifier : Text; icrc1_identifier : Text; balance : Nat }, ()>;
 
   //////////////////////
   /// Canister State ///
@@ -57,43 +49,83 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
   private stable var _mainNeuronId : ?Nat64 = null;
 
+  // storage for staked amount to track what you added
+
+  // storage for split neuron IDs to track what you are withdrawing
+
   ////////////////////////
   /// public Functions ///
   ////////////////////////
 
-  public shared ({ caller }) func controller_get_canister_accounts() : async CanisterAccountsResult {
-    assert (caller == owner);
+  public shared ({ caller }) func initiate_icp_stake_transfer() : async IcpStakeTransferResult {
+    assert (Principal.isAnonymous(caller) == false);
+    return await initiateIcpStakeTransfer(caller);
+  };
+
+  public shared ({ caller }) func get_canister_accounts() : async CanisterAccountsResult {
+    assert (Principal.isAnonymous(caller) == false);
     return await getCanisterAccounts();
   };
 
-  public shared ({ caller }) func controller_canister_legacy_transfer(to : Text, amount : Nat64) : async CanisterLegacyTransferResult {
-    assert (caller == owner);
-    return await canisterLegacyTransfer(to, amount, null);
-  };
-
-  public shared ({ caller }) func controller_canister_icrc1_transfer(to : Text, amount : Nat) : async CanisterIcrc1TransferResult {
-    assert (caller == owner);
-    return await canisterIcrc1Transfer(to, amount);
-  };
-
-  public shared ({ caller }) func controller_stake_neuron(amount : Nat64) : async Nat64 {
+  public shared ({ caller }) func controller_stake_neuron(amount : Nat64) : async StakeNeuronResult {
     assert (caller == owner);
     return await stakeNeuron(amount);
   };
 
-  ////////////////////////////////
-  /// Canister Stake Functions ///
-  ////////////////////////////////
+  /////////////////////////////////
+  /// Canister Neuron Functions ///
+  /////////////////////////////////
+
+  private func initiateIcpStakeTransfer(caller : Principal) : async IcpStakeTransferResult {
+    let ?mainNeuronId = _mainNeuronId else return #err("Main neuron ID not found");
+
+    let { allowance } = await IcpLedger.icrc2_allowance({
+      account = { owner = caller; subaccount = null };
+      spender = { owner = Principal.fromActor(thisCanister); subaccount = null };
+    });
+
+    // TODO checks on allowance amount such as setting a minimum
+
+    switch (await IcpGovernance.get_full_neuron(mainNeuronId)) {
+      case (#Ok { account }) {
+        let transferResult = await IcpLedger.icrc2_transfer_from({
+          to = {
+            owner = Principal.fromActor(IcpGovernance); // NNS canister
+            subaccount = ?Blob.fromArray(account); // neuron account
+          };
+          from = { owner = caller; subaccount = null };
+          spender_subaccount = null;
+          fee = null;
+          memo = null;
+          created_at_time = null;
+          amount = allowance;
+        });
+
+        switch (transferResult) {
+          case (#Ok _) {
+            // TODO add to memory the stake amount
+
+            return #ok();
+          };
+          case (#Err error) {
+            return #err(debug_show error);
+          };
+        };
+      };
+      case (#Err error) {
+        return #err(debug_show error);
+      };
+    };
+  };
 
   // WON'T WORK UNTIL CANISTERS CAN STAKE NEURONS
-  private func stakeNeuron(amount : Nat64) : async Nat64 {
-    if (Option.isSome(_mainNeuronId) or amount < ONE_ICP + ICP_PROTOCOL_FEE) {
-      Debug.trap("Failed to proceed with staking a new neuron");
-    };
+  private func stakeNeuron(amount : Nat64) : async StakeNeuronResult {
+    // guard clauses
+    if (Option.isSome(_mainNeuronId)) return #err("Main neuron has already been staked");
+    if (amount < ONE_ICP + ICP_PROTOCOL_FEE) return #err("A minimum of 1.0001 ICP is needed to stake");
 
     // generate a random nonce that fits into Nat64
-    // let-else option binding
-    let ?nonce = Random.Finite(await Random.blob()).range(64) else Debug.trap("Failed to generate nonce");
+    let ?nonce = Random.Finite(await Random.blob()).range(64) else return #err("Failed to generate nonce");
 
     // controller is the canister
     let neuronController : Principal = Principal.fromActor(thisCanister);
@@ -102,10 +134,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     let newSubaccount : Blob = computeNeuronStakingSubaccountBytes(neuronController, Nat64.fromNat(nonce));
 
     // the neuron account ID is a sub account of the governance canister
-    let newNeuronAccount : Text = Principal.fromActor(IcpGovernance) |> AccountIdentifier.accountIdentifier(_, newSubaccount) |> Blob.toArray(_) |> Hex.encode(_); // pipe operators
+    let newNeuronAccount : Blob = AccountIdentifier.accountIdentifier(Principal.fromActor(IcpGovernance), newSubaccount);
 
-    switch (await canisterLegacyTransfer(newNeuronAccount, amount, ?Nat64.fromNat(nonce))) {
-      case (#Ok result) {
+    switch (await IcpLedger.transfer({ memo = Nat64.fromNat(nonce); from_subaccount = null; to = newNeuronAccount; amount = { e8s = amount - ICP_PROTOCOL_FEE }; fee = { e8s = ICP_PROTOCOL_FEE }; created_at_time = null })) {
+      case (#Ok _) {
         // ClaimOrRefresh: finds the neuron by subaccount and checks if the memo matches the nonce
         let { command } = await IcpGovernance.manage_neuron({
           id = null;
@@ -119,25 +151,25 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         });
 
         let ?commandList = command else {
-          return Debug.trap("Failed to stake. Nonce: " # debug_show nonce # " command result: " # debug_show command);
+          return #err("Failed to stake. " # debug_show command);
         };
 
         switch (commandList) {
           case (#ClaimOrRefresh { refreshed_neuron_id }) {
 
-            let ?{ id } = refreshed_neuron_id else Debug.trap("Failed to retrieve new neuron Id. Nonce: " # debug_show nonce);
+            let ?{ id } = refreshed_neuron_id else return #err("Failed to retrieve new neuron Id.");
             // store the staked neuron locally
             _mainNeuronId := ?id;
 
-            return id;
+            return #ok(id);
           };
           case _ {
-            return Debug.trap("Failed to stake. Nonce: " # debug_show nonce # " command result: " # debug_show commandList);
+            return #err("Failed to stake. " # debug_show commandList);
           };
         };
       };
-      case (#Err result) {
-        return Debug.trap("Failed to transfer ICP: " # debug_show result);
+      case (#Err error) {
+        return #err("Failed to transfer ICP: " # debug_show error);
       };
     };
   };
@@ -152,70 +184,22 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     return hash.sum();
   };
 
-  /////////////////////////////////
-  /// Canister Wallet Functions ///
-  /////////////////////////////////
-
-  private func getCanisterAccountIdentifier() : [Nat8] {
-    return Blob.toArray(
-      AccountIdentifier.accountIdentifier(
-        Principal.fromActor(thisCanister),
-        AccountIdentifier.defaultSubaccount(),
-      )
-    );
-  };
-
-  private func getCanisterIcrcAccount() : IcpLedgerInterface.Account {
-    return { owner = Principal.fromActor(thisCanister); subaccount = null };
-  };
-
-  private func getCanisterBalance() : async Nat {
-    return await IcpLedger.icrc1_balance_of(getCanisterIcrcAccount());
-  };
-
-  private func canisterLegacyTransfer(to : Text, amount : Nat64, memo : ?Nat64) : async CanisterLegacyTransferResult {
-    switch (Hex.decode(to)) {
-      case (#ok address_decoded) {
-        return await IcpLedger.transfer({
-          memo = Option.get<Nat64>(memo, 0);
-          from_subaccount = ?AccountIdentifier.defaultSubaccount();
-          to = Blob.fromArray(address_decoded);
-          amount = { e8s = amount - ICP_PROTOCOL_FEE };
-          fee = { e8s = ICP_PROTOCOL_FEE };
-          created_at_time = null;
-        })
-
-      };
-      case (#err address_decoded) {
-        Debug.trap("Address failed to decode");
-      };
-    };
-  };
-
-  private func canisterIcrc1Transfer(to : Text, amount : Nat) : async CanisterIcrc1TransferResult {
-    switch (Account.fromText((to))) {
-      case (#ok account_decoded) {
-        return await IcpLedger.icrc1_transfer({
-          to = account_decoded;
-          fee = null; // default
-          memo = null;
-          from_subaccount = null;
-          created_at_time = null;
-          amount = amount - Nat64.toNat(ICP_PROTOCOL_FEE);
-        });
-      };
-      case (#err address_decoded) {
-        Debug.trap("Account failed to decode");
-      };
-    };
-  };
+  //////////////////////////
+  /// Canister Functions ///
+  //////////////////////////
 
   private func getCanisterAccounts() : async CanisterAccountsResult {
-    return {
-      account_identifier = Hex.encode(getCanisterAccountIdentifier());
-      icrc1_identifier = Account.toText(getCanisterIcrcAccount());
-      balance = await getCanisterBalance();
-    };
+    return #ok({
+      account_identifier = Principal.fromActor(thisCanister) |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_) |> Hex.encode(_);
+      icrc1_identifier = Account.toText({
+        owner = Principal.fromActor(thisCanister);
+        subaccount = null;
+      });
+      balance = await IcpLedger.icrc1_balance_of({
+        owner = Principal.fromActor(thisCanister);
+        subaccount = null;
+      });
+    });
   };
 
 };

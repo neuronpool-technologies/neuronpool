@@ -11,6 +11,4 @@
 # canister test functions:
 # 
 
-# dfx canister --network ic call NeuronPool controller_get_canister_accounts
-# dfx canister --network ic call NeuronPool controller_canister_legacy_transfer '("<address>", <amount>)'
-# dfx canister --network ic call NeuronPool controller_canister_icrc1_transfer '("<ICRC-1 Account>", <amount>)'
+# dfx canister --network ic call NeuronPool get_canister_accounts

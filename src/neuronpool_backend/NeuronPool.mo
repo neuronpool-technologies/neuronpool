@@ -35,11 +35,28 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   /// Types ///
   /////////////
 
+  public type HistoryTransaction = {
+    operation : Operation;
+    timestamp : Nat64;
+  };
+
+  public type Operation = {
+    #Stake : Any;
+  };
+
+  public type NeuronId = Nat64;
+
   public type Result<X, Y> = Result.Result<X, Y>;
 
   public type StakeNeuronResult = Result<Nat64, Text>;
 
   public type IcpStakeTransferResult = Result<(), Text>;
+
+  public type IcpStakeWithdrawalResult = Result<(), Text>;
+
+  public type IcpStakeDissolveResult = Result<(), Text>;
+
+  public type IcpStakeDisburseResult = Result<(), Text>;
 
   public type CanisterAccountsResult = Result<{ account_identifier : Text; icrc1_identifier : Text; balance : Nat }, ()>;
 
@@ -47,20 +64,16 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   /// Canister State ///
   //////////////////////
 
-  private stable var _mainNeuronId : ?Nat64 = null;
-
-  // storage for staked amount to track what you added
-
-  // storage for split neuron IDs to track what you are withdrawing
+  private stable var _mainNeuronId : ?NeuronId = null;
 
   ////////////////////////
-  /// public Functions ///
+  /// Public Functions ///
   ////////////////////////
 
-  public shared ({ caller }) func initiate_icp_stake_transfer() : async IcpStakeTransferResult {
-    assert (Principal.isAnonymous(caller) == false);
-    return await initiateIcpStakeTransfer(caller);
-  };
+  // public shared ({ caller }) func initiate_icp_stake_transfer() : async IcpStakeTransferResult {
+  //   assert (Principal.isAnonymous(caller) == false);
+  //   return await initiateIcpStakeTransfer(caller);
+  // };
 
   public shared ({ caller }) func get_canister_accounts() : async CanisterAccountsResult {
     assert (Principal.isAnonymous(caller) == false);
@@ -76,47 +89,114 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   /// Canister Neuron Functions ///
   /////////////////////////////////
 
-  private func initiateIcpStakeTransfer(caller : Principal) : async IcpStakeTransferResult {
-    let ?mainNeuronId = _mainNeuronId else return #err("Main neuron ID not found");
+  // private func initiateIcpStakeTransfer(caller : Principal) : async IcpStakeTransferResult {
+  //   let ?mainNeuronId = _mainNeuronId else return #err("Main neuron ID not found");
 
-    let { allowance } = await IcpLedger.icrc2_allowance({
-      account = { owner = caller; subaccount = null };
-      spender = { owner = Principal.fromActor(thisCanister); subaccount = null };
-    });
+  //   let { allowance } = await IcpLedger.icrc2_allowance({
+  //     account = { owner = caller; subaccount = null };
+  //     spender = { owner = Principal.fromActor(thisCanister); subaccount = null };
+  //   });
 
-    // TODO checks on allowance amount such as setting a minimum
+  //   // TODO checks on allowance amount such as setting a minimum
 
-    switch (await IcpGovernance.get_full_neuron(mainNeuronId)) {
-      case (#Ok { account }) {
-        let transferResult = await IcpLedger.icrc2_transfer_from({
-          to = {
-            owner = Principal.fromActor(IcpGovernance); // NNS canister
-            subaccount = ?Blob.fromArray(account); // neuron account
-          };
-          from = { owner = caller; subaccount = null };
-          spender_subaccount = null;
-          fee = null;
-          memo = null;
-          created_at_time = null;
-          amount = allowance;
-        });
+  //   switch (await IcpGovernance.get_full_neuron(mainNeuronId)) {
+  //     case (#Ok { account }) {
+  //       let transferResult = await IcpLedger.icrc2_transfer_from({
+  //         to = {
+  //           owner = Principal.fromActor(IcpGovernance); // NNS canister
+  //           subaccount = ?Blob.fromArray(account); // neuron account
+  //         };
+  //         from = { owner = caller; subaccount = null };
+  //         spender_subaccount = null;
+  //         fee = null;
+  //         memo = null;
+  //         created_at_time = null;
+  //         amount = allowance;
+  //       });
 
-        switch (transferResult) {
-          case (#Ok _) {
-            // TODO add to memory the stake amount
+  //       switch (transferResult) {
+  //         case (#Ok _) {
+  //           // check for previous amount
+  //           let ?prevAmount = Map.get(_stakerBalances, Map.phash, caller) else {
+  //             Map.set(_stakerBalances, Map.phash, caller, Nat64.fromNat(allowance));
 
-            return #ok();
-          };
-          case (#Err error) {
-            return #err(debug_show error);
-          };
-        };
-      };
-      case (#Err error) {
-        return #err(debug_show error);
-      };
-    };
-  };
+  //             return #ok();
+  //           };
+            
+  //           // set the new amount
+  //           Map.set(_stakerBalances, Map.phash, caller, Nat64.fromNat(allowance) + prevAmount);
+
+  //           return #ok();
+  //         };
+  //         case (#Err error) {
+  //           return #err(debug_show error);
+  //         };
+  //       };
+  //     };
+  //     case (#Err error) {
+  //       return #err(debug_show error);
+  //     };
+  //   };
+  // };
+
+  // private func initiateIcpStakeWithdrawal(caller : Principal) : async IcpStakeWithdrawalResult {
+  //   let ?mainNeuronId = _mainNeuronId else return #err("Main neuron ID not found");
+
+  //   let ?balance = Map.get(_stakerBalances, Map.phash, caller) else return #err("Balance not found for caller: " # debug_show caller # ". Ensure the caller has staked.");
+
+  //   let { command } = await IcpGovernance.manage_neuron({
+  //     id = ?{ id = mainNeuronId };
+  //     neuron_id_or_subaccount = null;
+  //     command = ? #Split({ amount_e8s = balance });
+  //   });
+
+  //   let ?commandList = command else return #err("Failed to split new neuron");
+
+  //   switch (commandList) {
+  //     case (#Split { created_neuron_id }) {
+
+  //       let ?{ id } = created_neuron_id else return #err("Failed to retrieve new neuron Id");
+
+  //       Map.delete(_stakerBalances, Map.phash, caller);
+
+  //       Map.set(_pendingWithdrawalNeurons, Map.phash, caller, id);
+
+  //       return #ok();
+  //     };
+  //     case _ {
+  //       return #err("Failed to stake. " # debug_show commandList);
+  //     };
+  //   };
+  // };
+
+  // private func processIcpStakeDissolve(caller : Principal) : async IcpStakeDissolveResult {
+  //   let ?userNeuron = Map.get(_pendingWithdrawalNeurons, Map.phash, caller) else return #err("Neuron not found for caller: " # debug_show caller);
+
+  //   let { command } = await IcpGovernance.manage_neuron({
+  //     id = ?{ id = userNeuron };
+  //     neuron_id_or_subaccount = null;
+  //     command = ? #Configure({ operation = ? #StartDissolving({}) });
+  //   });
+
+  //   let ?commandList = command else return #err("Failed to start dissolving neuron");
+
+  //   switch (commandList) {
+  //     case (#Configure _) { return #ok() };
+  //     case _ {
+  //       return #err("Failed to start dissolving neuron. " # debug_show commandList);
+  //     };
+  //   };
+  // };
+
+  // private func processIcpStakeDisburse(caller : Principal) : async IcpStakeDisburseResult {
+  //   let ?userNeuron = Map.get(_pendingWithdrawalNeurons, Map.phash, caller) else return #err("Neuron not found for caller: " # debug_show caller);
+
+  //   let { command } = await IcpGovernance.manage_neuron({
+  //     id = ?{ id = userNeuron };
+  //     neuron_id_or_subaccount = null;
+  //     command = ? #Configure({ operation = ? #StartDissolving({}) });
+  //   });
+  // };
 
   // WON'T WORK UNTIL CANISTERS CAN STAKE NEURONS
   private func stakeNeuron(amount : Nat64) : async StakeNeuronResult {
@@ -150,14 +230,12 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
           });
         });
 
-        let ?commandList = command else {
-          return #err("Failed to stake. " # debug_show command);
-        };
+        let ?commandList = command else return #err("Failed to claim new neuron");
 
         switch (commandList) {
           case (#ClaimOrRefresh { refreshed_neuron_id }) {
 
-            let ?{ id } = refreshed_neuron_id else return #err("Failed to retrieve new neuron Id.");
+            let ?{ id } = refreshed_neuron_id else return #err("Failed to retrieve new neuron Id");
             // store the staked neuron locally
             _mainNeuronId := ?id;
 

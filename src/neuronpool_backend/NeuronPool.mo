@@ -60,8 +60,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   public type Action = {
     #StakeTransfer : StakeTransfer;
     #StakeWithdrawal : StakeWithdrawal;
-    #RewardSpawn : RewardSpawn;
+    #SpawnReward : SpawnReward;
     #CreateNeuron : CreateNeuron;
+    #Error : Error;
   };
 
   public type StakeTransfer = {
@@ -75,9 +76,14 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     neuron_id : NeuronId;
   };
 
-  public type RewardSpawn = {
+  public type SpawnReward = {
     winner : Principal;
     neuron_id : NeuronId;
+  };
+
+  public type Error = {
+    function : Text;
+    message : Text;
   };
 
   public type CreateNeuron = {
@@ -337,20 +343,25 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   /// Prize Pool Functions ///
   ////////////////////////////
 
+  // Timer function
   // TODO only call this when maturity is above 1 ICP
-  // TODO Should log the result of this fucntion 
-  // TODO use the #RewardSpawn which needs an error variant
-  private func generateIcpPoolWinner() : async () {
-    let ?mainNeuron = mainNeuronId() else return;
+  private func spawnRandomReward() : async () {
+    let ?mainNeuron = mainNeuronId() else {
+      return ignore logOperation(#Error({ function = "spawnRandomReward()"; message = "Main neuron ID not found" }));
+    };
 
     // Calculate total stake amount for generating random threshold
     let totalAmount = getTotalStakeAmount();
 
-    let ?randomNumber = generateRandomThreshold(Random.Finite(await Random.blob()), totalAmount) else return;
+    let ?randomNumber = generateRandomThreshold(Random.Finite(await Random.blob()), totalAmount) else {
+      return ignore logOperation(#Error({ function = "spawnRandomReward()"; message = "Failed to generate random threshold" }));
+    };
 
-    let ?winner = weightedSelection(randomNumber) else return;
+    let ?winner = weightedSelection(randomNumber) else {
+      return ignore logOperation(#Error({ function = "spawnRandomReward()"; message = "Failed to find a winner" }));
+    };
 
-    ignore await IcpGovernance.manage_neuron({
+    let { command } = await IcpGovernance.manage_neuron({
       id = ?{ id = mainNeuron };
       neuron_id_or_subaccount = null;
       command = ? #Spawn({
@@ -359,6 +370,25 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         nonce = null;
       });
     });
+
+    let ?commandList = command else {
+      return ignore logOperation(#Error({ function = "spawnRandomReward()"; message = "Failed to spawn new neuron" }));
+    };
+
+    switch (commandList) {
+      case (#Spawn { created_neuron_id }) {
+
+        let ?{ id } = created_neuron_id else {
+          return ignore logOperation(#Error({ function = "spawnRandomReward()"; message = "Failed to retrieve new neuron Id" }));
+        };
+
+        // store the staked neuron in the log
+        return ignore logOperation(#SpawnReward({ winner = winner; neuron_id = id }));
+      };
+      case _ {
+        return ignore logOperation(#Error({ function = "spawnRandomReward()"; message = "Failed to spawn. " # debug_show commandList }));
+      };
+    };
   };
 
   private func weightedSelection(randomThreshold : Nat64) : ?Principal {
@@ -532,7 +562,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             filtered.add(args.neuron_id);
           };
         };
-        case (#RewardSpawn(args)) {
+        case (#SpawnReward(args)) {
           if (Principal.equal(caller, args.winner)) {
             filtered.add(args.neuron_id);
           };

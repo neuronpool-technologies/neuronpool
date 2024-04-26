@@ -13,7 +13,6 @@ import Binary "mo:encoding/Binary";
 import Account "mo:account";
 import Vector "mo:vector";
 import VectorClass "mo:vector/Class";
-import Map "mo:map/Map";
 import AccountIdentifier "mo:account-identifier";
 import IcpLedgerInterface "./ledger_interface";
 import IcpGovernanceInterface "./governance_interface";
@@ -156,7 +155,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
       };
     });
 
-    // TODO checks on allowance amount such as setting a minimum
+    if (Nat64.fromNat(allowance) < ICP_PROTOCOL_FEE * 2) return #err("A minimum of 0.0002 ICP is needed");
+
+    let amountToStake = Nat64.fromNat(allowance) - ICP_PROTOCOL_FEE; // allowance >= amount + fee
 
     switch (await IcpGovernance.get_full_neuron(mainNeuron)) {
       case (#Ok { account }) {
@@ -170,7 +171,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
           fee = null;
           memo = null;
           created_at_time = null;
-          amount = allowance;
+          amount = Nat64.toNat(amountToStake);
         });
 
         switch (transferResult) {
@@ -179,7 +180,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
               logOperation(
                 #StakeTransfer({
                   staker = caller;
-                  amount_e8s = Nat64.fromNat(allowance) - ICP_PROTOCOL_FEE;
+                  amount_e8s = amountToStake;
                 })
               )
             );
@@ -202,34 +203,37 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
     let balance = stakerBalance(caller);
 
-    if (balance < amount) return #err("Insufficient balance for caller: " # debug_show caller # ". Balance: " # debug_show balance);
+    if (balance >= amount) {
+      // neuron pays the fee, so minus it from user amount
+      let { command } = await IcpGovernance.manage_neuron({
+        id = ?{ id = mainNeuron };
+        neuron_id_or_subaccount = null;
+        command = ? #Split({ amount_e8s = amount - ICP_PROTOCOL_FEE });
+      });
 
-    let { command } = await IcpGovernance.manage_neuron({
-      id = ?{ id = mainNeuron };
-      neuron_id_or_subaccount = null;
-      command = ? #Split({ amount_e8s = amount });
-    });
+      let ?commandList = command else return #err("Failed to split new neuron");
 
-    let ?commandList = command else return #err("Failed to split new neuron");
+      switch (commandList) {
+        case (#Split { created_neuron_id }) {
 
-    switch (commandList) {
-      case (#Split { created_neuron_id }) {
+          let ?{ id } = created_neuron_id else return #err("Failed to retrieve new neuron Id");
 
-        let ?{ id } = created_neuron_id else return #err("Failed to retrieve new neuron Id");
-
-        return #ok(
-          logOperation(
-            #StakeWithdrawal({
-              staker = caller;
-              amount_e8s = amount;
-              neuron_id = id;
-            })
-          )
-        );
+          return #ok(
+            logOperation(
+              #StakeWithdrawal({
+                staker = caller;
+                amount_e8s = amount;
+                neuron_id = id; // neuron balance will be amount - protocol fee
+              })
+            )
+          );
+        };
+        case _ {
+          return #err("Failed to stake. " # debug_show commandList);
+        };
       };
-      case _ {
-        return #err("Failed to stake. " # debug_show commandList);
-      };
+    } else {
+      return #err("Insufficient balance for caller: " # debug_show caller # ". Balance: " # debug_show balance);
     };
   };
 
@@ -262,7 +266,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         to_account = ?{
           hash = AccountIdentifier.accountIdentifier(caller, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
         };
-        amount = null;
+        amount = null; // defaults to 100%
       });
     });
 
@@ -353,7 +357,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     // Calculate total stake amount for generating random threshold
     let totalAmount = getTotalStakeAmount();
 
-    let ?randomNumber = generateRandomThreshold(Random.Finite(await Random.blob()), totalAmount) else {
+    let ?randomNumber = await generateRandomThreshold(totalAmount) else {
       return ignore logOperation(#Error({ function = "spawnRandomReward()"; message = "Failed to generate random threshold" }));
     };
 
@@ -392,23 +396,33 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   };
 
   private func weightedSelection(randomThreshold : Nat64) : ?Principal {
-    let allStakers = getCurrentStakersAndAmounts();
+    // TODO
+    // var runningSum : Nat64 = 0;
 
-    var runningSum : Nat64 = 0;
-    label find_winner_loop for (stakerAmounts in allStakers.vals()) {
-      let (staker, amount) = stakerAmounts;
+    // for (op in Vector.vals(_operationHistory)) {
+    //   switch (op.action) {
+    //     case (#StakeTransfer(args)) {
+    //       runningSum += args.amount_e8s;
 
-      runningSum += amount;
-
-      if (runningSum >= randomThreshold) {
-        return ?staker;
-      };
-    };
-
+    //       if (runningSum >= randomThreshold) {
+    //         // Validates that the stakers balance is greater than or equal to the weight that one
+    //         if (stakerBalance(args.staker) >= args.amount_e8s) {
+    //           return ?args.staker;
+    //         };
+    //       };
+    //     };
+    //     case (#StakeWithdrawal(args)) {
+    //       runningSum -= args.amount_e8s;
+    //     };
+    //     case _ { /* do nothing */ };
+    //   };
+    // };
     return null;
   };
 
-  private func generateRandomThreshold(random : Random.Finite, totalStakeAmount : Nat64) : ?Nat64 {
+  private func generateRandomThreshold(totalStakeAmount : Nat64) : async ?Nat64 {
+    let random = Random.Finite(await Random.blob());
+
     // We find the minimum p needed for range
     var p : Nat8 = 0;
     var value : Nat64 = 1;
@@ -470,34 +484,6 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     };
 
     return sum;
-  };
-
-  private func getCurrentStakersAndAmounts() : [(Principal, Nat64)] {
-    let map = Map.new<Principal, Nat64>();
-
-    for (op in Vector.vals(_operationHistory)) {
-      switch (op.action) {
-        case (#StakeTransfer(args)) {
-          Map.set(map, Map.phash, args.staker, args.amount_e8s);
-        };
-        case (#StakeWithdrawal(args)) {
-          ignore Map.update(
-            map,
-            Map.phash,
-            args.staker,
-            func(k : Principal, v : ?Nat64) : ?Nat64 {
-              let ?oldValue = v else return null;
-              let newValue = oldValue - args.amount_e8s;
-              return ?newValue;
-            },
-          )
-
-        };
-        case _ { /* do nothing */ };
-      };
-    };
-
-    return Map.toArray(map);
   };
 
   ///////////////////////////////////

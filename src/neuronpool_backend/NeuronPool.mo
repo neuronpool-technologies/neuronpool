@@ -49,6 +49,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
   public type CanisterAccountsResult = Result<CanisterAccounts, ()>;
 
+  public type MainNeuronInfoResult = Result<IcpGovernanceInterface.NeuronInfo, Text>;
+
+  public type MainNeuronResult = Result<IcpGovernanceInterface.Neuron, Text>;
+
   public type OperationResponse = Result<OperationIndex, Text>;
 
   public type ConfigurationResponse = Result<(), Text>;
@@ -136,9 +140,21 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     return getWithdrawalNeurons(caller);
   };
 
-  public shared ({ caller }) func get_canister_accounts() : async CanisterAccountsResult {
-    assert (Principal.isAnonymous(caller) == false);
+  public query func get_operation_history() : async [Operation] {
+    return Vector.toArray(_operationHistory);
+  };
+
+  public func get_canister_accounts() : async CanisterAccountsResult {
     return await getCanisterAccounts();
+  };
+
+  public func get_main_neuron_info() : async MainNeuronInfoResult {
+    return await getMainNeuronInfo();
+  };
+
+  public shared ({ caller }) func controller_get_main_neuron() : async MainNeuronResult {
+    assert (caller == owner);
+    return await getMainNeuron();
   };
 
   public shared ({ caller }) func controller_stake_neuron(amount : Nat64) : async OperationResponse {
@@ -515,7 +531,31 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   /// Canister Functions ///
   //////////////////////////
 
-  // TODO stat functions
+  private func getMainNeuronInfo() : async MainNeuronInfoResult {
+    let ?mainNeuron = mainNeuronId() else return #err("Main neuron ID not found");
+
+    switch (await IcpGovernance.get_neuron_info(mainNeuron)) {
+      case (#Ok neuron) {
+        return #ok(neuron);
+      };
+      case (#Err error) {
+        return #err(debug_show error);
+      };
+    };
+  };
+
+  private func getMainNeuron() : async MainNeuronResult {
+    let ?mainNeuron = mainNeuronId() else return #err("Main neuron ID not found");
+
+    switch (await IcpGovernance.get_full_neuron(mainNeuron)) {
+      case (#Ok neuron) {
+        return #ok(neuron);
+      };
+      case (#Err error) {
+        return #err(debug_show error);
+      };
+    };
+  };
 
   private func getCanisterAccounts() : async CanisterAccountsResult {
     return #ok({

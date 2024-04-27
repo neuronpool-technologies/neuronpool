@@ -11,6 +11,7 @@ import Sha256 "mo:sha2/Sha256";
 import Hex "mo:encoding/Hex";
 import Binary "mo:encoding/Binary";
 import Account "mo:account";
+import Map "mo:map/Map";
 import Vector "mo:vector";
 import VectorClass "mo:vector/Class";
 import AccountIdentifier "mo:account-identifier";
@@ -34,6 +35,11 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
   // 1 ICP in e8s
   let ONE_ICP : Nat64 = 100_000_000;
+
+  // The canister controlled neuron will follow this neuron on all votes
+  let DEFAULT_NEURON_FOLLOWEE : NeuronId = 6914974521667616512; // Rakeoff.io named neuron
+
+  let NEURON_DISSOLVE_DELAY_SECONDS : Nat32 = 15897600; // 184 days
 
   /////////////
   /// Types ///
@@ -130,14 +136,24 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     return getWithdrawalNeurons(caller);
   };
 
+  public shared ({ caller }) func get_canister_accounts() : async CanisterAccountsResult {
+    assert (Principal.isAnonymous(caller) == false);
+    return await getCanisterAccounts();
+  };
+
   public shared ({ caller }) func controller_stake_neuron(amount : Nat64) : async OperationResponse {
     assert (caller == owner);
     return await stakeNeuron(amount);
   };
 
-  public shared ({ caller }) func controller_get_canister_accounts() : async CanisterAccountsResult {
+  public shared ({ caller }) func controller_set_neuron_dissolve_delay() : async ConfigurationResponse {
     assert (caller == owner);
-    return await getCanisterAccounts();
+    return await setNeuronDissolveDelay();
+  };
+
+  public shared ({ caller }) func contoller_set_governance_following(topic : Int32, followee : ?NeuronId) : async ConfigurationResponse {
+    assert (caller == owner);
+    return await setGovernanceFollowing(topic, followee);
   };
 
   /////////////////////////////////
@@ -343,6 +359,61 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     };
   };
 
+  private func setNeuronDissolveDelay() : async ConfigurationResponse {
+    let ?mainNeuron = mainNeuronId() else return #err("Main neuron ID not found");
+
+    switch (await IcpGovernance.get_neuron_info(mainNeuron)) {
+      case (#Ok { dissolve_delay_seconds }) {
+        if (dissolve_delay_seconds > 0) return #err("Dissolve delay already set");
+
+        let { command } = await IcpGovernance.manage_neuron({
+          id = ?{ id = mainNeuron };
+          neuron_id_or_subaccount = null;
+          command = ? #Configure({
+            operation = ? #IncreaseDissolveDelay({
+              additional_dissolve_delay_seconds = NEURON_DISSOLVE_DELAY_SECONDS;
+            });
+          });
+        });
+
+        let ?commandList = command else return #err("Failed to set neuron dissolve delay");
+
+        switch (commandList) {
+          case (#Configure _) { return #ok() };
+          case _ {
+            return #err("Failed to set neuron dissolve delay. " # debug_show commandList);
+          };
+        };
+      };
+      case (#Err error) {
+        return #err(debug_show error);
+      };
+    };
+  };
+
+  private func setGovernanceFollowing(topic : Int32, followee : ?NeuronId) : async ConfigurationResponse {
+    let ?mainNeuron = mainNeuronId() else return #err("Main neuron ID not found");
+
+    // if null is passed use the default followee
+    let followNeuron = Option.get(followee, DEFAULT_NEURON_FOLLOWEE);
+
+    let { command } = await IcpGovernance.manage_neuron({
+      id = ?{ id = mainNeuron };
+      neuron_id_or_subaccount = null;
+      command = ? #Follow({ topic = topic; followees = [{ id = followNeuron }] });
+    });
+
+    let ?commandList = command else return #err("Failed to set followee");
+
+    switch (commandList) {
+      case (#Follow _) { return #ok() };
+      case _ {
+        return #err("Failed to set followee. " # debug_show commandList);
+      };
+    };
+
+  };
+
   ////////////////////////////
   /// Prize Pool Functions ///
   ////////////////////////////
@@ -396,10 +467,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   };
 
   private func weightedSelection(randomThreshold : Nat64) : ?Principal {
-    let allStakers = getCurrentStakers();
+    let currentStakers = getCurrentStakers();
 
     var runningSum : Nat64 = 0;
-    label find_winner_loop for (stakerAmounts in allStakers.vals()) {
+    for (stakerAmounts in currentStakers.vals()) {
       let (staker, amount) = stakerAmounts;
 
       runningSum += amount;
@@ -478,7 +549,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   };
 
   private func getCurrentStakers() : [(Principal, Nat64)] {
-    let filtered = VectorClass.Vector<(Principal, Nat64)>();
+    let stakers = Map.new<Principal, Nat64>();
 
     for (op in Vector.vals(_operationHistory)) {
       switch (op.action) {
@@ -486,14 +557,14 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
           let balance = stakerBalance(args.staker);
 
           if (balance > 0) {
-            filtered.add((args.staker, balance));
+            Map.set(stakers, Map.phash, args.staker, balance);
           };
         };
         case _ { /* do nothing */ };
       };
     };
 
-    return VectorClass.toArray(filtered);
+    return Map.toArray(stakers);
   };
 
   ///////////////////////////////////

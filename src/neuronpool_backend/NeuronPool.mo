@@ -396,27 +396,19 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   };
 
   private func weightedSelection(randomThreshold : Nat64) : ?Principal {
-    // TODO
-    // var runningSum : Nat64 = 0;
+    let allStakers = getCurrentStakers();
 
-    // for (op in Vector.vals(_operationHistory)) {
-    //   switch (op.action) {
-    //     case (#StakeTransfer(args)) {
-    //       runningSum += args.amount_e8s;
+    var runningSum : Nat64 = 0;
+    label find_winner_loop for (stakerAmounts in allStakers.vals()) {
+      let (staker, amount) = stakerAmounts;
 
-    //       if (runningSum >= randomThreshold) {
-    //         // Validates that the stakers balance is greater than or equal to the weight that one
-    //         if (stakerBalance(args.staker) >= args.amount_e8s) {
-    //           return ?args.staker;
-    //         };
-    //       };
-    //     };
-    //     case (#StakeWithdrawal(args)) {
-    //       runningSum -= args.amount_e8s;
-    //     };
-    //     case _ { /* do nothing */ };
-    //   };
-    // };
+      runningSum += amount;
+
+      if (runningSum >= randomThreshold) {
+        return ?staker;
+      };
+    };
+
     return null;
   };
 
@@ -446,7 +438,6 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
     // Insufficient entropy to generate a random winning number.
     return null;
-
   };
 
   //////////////////////////
@@ -484,6 +475,25 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     };
 
     return sum;
+  };
+
+  private func getCurrentStakers() : [(Principal, Nat64)] {
+    let filtered = VectorClass.Vector<(Principal, Nat64)>();
+
+    for (op in Vector.vals(_operationHistory)) {
+      switch (op.action) {
+        case (#StakeTransfer(args)) {
+          let balance = stakerBalance(args.staker);
+
+          if (balance > 0) {
+            filtered.add((args.staker, balance));
+          };
+        };
+        case _ { /* do nothing */ };
+      };
+    };
+
+    return VectorClass.toArray(filtered);
   };
 
   ///////////////////////////////////

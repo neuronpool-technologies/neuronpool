@@ -2,13 +2,13 @@
 # Deploy canisters:
 # 
 
-# dfx deploy --network ic NeuronPool
+# dfx deploy --network ic neuronpool
 # dfx deploy --network ic neuronpool_frontend
-# dfx canister --network ic install --mode reinstall NeuronPool
-# dfx canister --network ic status NeuronPool
+# dfx canister --network ic install --mode reinstall neuronpool
+# dfx canister --network ic status neuronpool
 
 # 
 # canister test functions:
 # 
 
-# dfx canister --network ic call NeuronPool get_canister_accounts
+# dfx canister --network ic call neuronpool get_canister_accounts

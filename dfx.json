@@ -1,12 +1,12 @@
 {
   "canisters": {
-    "NeuronPool": {
-      "main": "src/neuronpool_backend/NeuronPool.mo",
+    "neuronpool": {
+      "main": "src/neuronpool_backend/main.mo",
       "type": "motoko"
     },
     "neuronpool_frontend": {
       "dependencies": [
-        "neuronpool_backend"
+        "neuronpool"
       ],
       "source": [
         "src/neuronpool_frontend/dist"

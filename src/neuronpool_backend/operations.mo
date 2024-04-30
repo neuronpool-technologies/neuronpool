@@ -78,7 +78,7 @@ module {
         return VectorClass.toArray(filtered);
     };
 
-    public func assertCallerOwnsNeuron(history : T.OperationHistory,caller : Principal, neuronId : T.NeuronId) : Bool {
+    public func assertCallerOwnsNeuron(history : T.OperationHistory, caller : Principal, neuronId : T.NeuronId) : Bool {
         for (op in Vector.vals(history)) {
             switch (op.action) {
                 case (#StakeWithdrawal(args)) {

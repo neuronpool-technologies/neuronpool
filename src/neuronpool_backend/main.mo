@@ -35,6 +35,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   // 1 ICP in e8s
   let ONE_ICP : Nat64 = 100_000_000;
 
+  // 0.1 ICP in e8s
+  let MINIMUM_STAKE : Nat64 = 10_000_000;
+
   // The canister controlled neuron will follow this neuron on all votes
   let DEFAULT_NEURON_FOLLOWEE : T.NeuronId = 6914974521667616512; // Rakeoff.io named neuron
 
@@ -127,7 +130,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
       };
     });
 
-    if (Nat64.fromNat(allowance) < ICP_PROTOCOL_FEE * 2) return #err("A minimum of 0.0002 ICP is needed");
+    if (Nat64.fromNat(allowance) < MINIMUM_STAKE + ICP_PROTOCOL_FEE) return #err("A minimum of 0.1001 ICP is needed");
 
     let amountToStake = Nat64.fromNat(allowance) - ICP_PROTOCOL_FEE; // allowance >= amount + fee
 

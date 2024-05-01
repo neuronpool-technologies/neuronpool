@@ -1,4 +1,4 @@
-import {test; expect; suite} "mo:test";
+import { test; expect; suite } "mo:test";
 import T "../../types";
 import Vector "mo:vector";
 import Principal "mo:base/Principal";

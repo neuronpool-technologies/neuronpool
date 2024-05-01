@@ -9,9 +9,7 @@ module {
         let currentStakers = Stats.getCurrentStakers(history);
 
         var runningSum : Nat64 = 0;
-        for (stakerAmounts in currentStakers.vals()) {
-            let (staker, amount) = stakerAmounts;
-
+        for ((staker, amount) in currentStakers.vals()) {
             runningSum += amount;
 
             if (runningSum >= randomThreshold) {

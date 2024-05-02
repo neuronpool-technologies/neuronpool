@@ -170,7 +170,7 @@ suite("test multiple users performing many actions", func() {
     let mockPrincipal : Principal = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
     let mockNeuronId : Nat64 = 4829694856491667492;
 
-    test("high usage and payload", func() {
+    test("high usage and payload (>100,000 operations)", func() {
         // simulate main neuron gets staked
         ignore Operations.logOperation(_mockOperationHistory, #CreateNeuron({
             neuron_id = mockNeuronId

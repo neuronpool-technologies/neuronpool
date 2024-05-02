@@ -41,7 +41,12 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   // The canister controlled neuron will follow this neuron on all votes
   let DEFAULT_NEURON_FOLLOWEE : T.NeuronId = 6914974521667616512; // Rakeoff.io named neuron
 
+  // The dissolve delay for the main. Also inherited by all split neurons
   let NEURON_DISSOLVE_DELAY_SECONDS : Nat32 = 15897600; // 184 days
+
+  // If this limit is reached we don't allow any more stakeTransfers
+  // All other operations are allowed to continue
+  let OPERATION_HISTORY_LIMIT : Nat = 100_000;
 
   //////////////////////
   /// Canister State ///
@@ -121,6 +126,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
   private func initiateIcpStakeTransfer(caller : Principal) : async T.OperationResponse {
     let ?mainNeuron = Operations.mainNeuronId(_operationHistory) else return #err("Main neuron ID not found");
+
+    if (Vector.size(_operationHistory) >= OPERATION_HISTORY_LIMIT) {
+      return #err("The operation history has reached its limit of " # debug_show OPERATION_HISTORY_LIMIT # " No additional stake transfers can be processed at this time.");
+    };
 
     let { allowance } = await IcpLedger.icrc2_allowance({
       account = { owner = caller; subaccount = null };

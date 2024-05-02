@@ -31,7 +31,7 @@ module {
                         stakers,
                         Map.phash,
                         args.staker,
-                        func(k : Principal, v : ?Nat64) : ?Nat64 {
+                        func(_k : Principal, v : ?Nat64) : ?Nat64 {
                             let ?previousValue = v else return ?args.amount_e8s;
                             // if an existing previous value, increment
                             return ?(previousValue + args.amount_e8s);
@@ -43,7 +43,7 @@ module {
                         stakers,
                         Map.phash,
                         args.staker,
-                        func(k : Principal, v : ?Nat64) : ?Nat64 {
+                        func(_k : Principal, v : ?Nat64) : ?Nat64 {
                             // if no previous value make no changes
                             let ?previousValue = v else return null;
                             // if an existing previous value, decrement
@@ -55,6 +55,6 @@ module {
             };
         };
 
-        return Map.filter(stakers, Map.phash, func(k : Principal, v : Nat64) : Bool { return v > 0 }) |> Map.toArray(_);
+        return Map.filter(stakers, Map.phash, func(_k : Principal, v : Nat64) : Bool { return v > 0 }) |> Map.toArray(_);
     };
 };

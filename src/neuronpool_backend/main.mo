@@ -63,17 +63,23 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     return await initiateIcpStakeTransfer(caller);
   };
 
-  public shared ({ caller }) func initiate_icp_stake_withdrawal(amount : Nat64) : async T.OperationResponse {
+  public shared ({ caller }) func initiate_icp_stake_withdrawal({
+    amount : Nat64;
+  }) : async T.OperationResponse {
     assert (Principal.isAnonymous(caller) == false);
     return await initiateIcpStakeWithdrawal(caller, amount);
   };
 
-  public shared ({ caller }) func process_icp_stake_dissolve(neuronId : T.NeuronId) : async T.ConfigurationResponse {
+  public shared ({ caller }) func process_icp_stake_dissolve({
+    neuronId : T.NeuronId;
+  }) : async T.ConfigurationResponse {
     assert (Principal.isAnonymous(caller) == false);
     return await processIcpStakeDissolve(caller, neuronId);
   };
 
-  public shared ({ caller }) func process_icp_stake_disburse(neuronId : T.NeuronId) : async T.ConfigurationResponse {
+  public shared ({ caller }) func process_icp_stake_disburse({
+    neuronId : T.NeuronId;
+  }) : async T.ConfigurationResponse {
     assert (Principal.isAnonymous(caller) == false);
     return await processIcpStakeDisburse(caller, neuronId);
   };
@@ -88,24 +94,19 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     return Operations.getStakerWithdrawalNeurons(_operationHistory, caller);
   };
 
-  public query func get_operation_history() : async [T.Operation] {
-    return Vector.toArray(_operationHistory);
+  public query func get_operation_history({ start : Nat; length : Nat}) : async T.HistoryResult {
+    return Operations.getOperationHistory(_operationHistory, start, length);
   };
 
   public func get_canister_accounts() : async T.CanisterAccountsResult {
     return await getCanisterAccounts();
   };
 
-  public func get_main_neuron_info() : async T.MainNeuronInfoResult {
-    return await getMainNeuronInfo();
-  };
-
-  public shared ({ caller }) func controller_get_main_neuron() : async T.MainNeuronResult {
-    assert (caller == owner);
+  public func get_main_neuron() : async T.FullNeuronResult {
     return await getMainNeuron();
   };
 
-  public shared ({ caller }) func controller_stake_neuron(amount : Nat64) : async T.OperationResponse {
+  public shared ({ caller }) func controller_stake_neuron({ amount : Nat64 }) : async T.OperationResponse {
     assert (caller == owner);
     return await stakeNeuron(amount);
   };
@@ -115,7 +116,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     return await setNeuronDissolveDelay();
   };
 
-  public shared ({ caller }) func contoller_set_governance_following(topic : Int32, followee : ?T.NeuronId) : async T.ConfigurationResponse {
+  public shared ({ caller }) func contoller_set_governance_following({
+    topic : Int32;
+    followee : ?T.NeuronId;
+  }) : async T.ConfigurationResponse {
     assert (caller == owner);
     return await setGovernanceFollowing(topic, followee);
   };
@@ -432,28 +436,40 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     };
   };
 
-  private func getMainNeuronInfo() : async T.MainNeuronInfoResult {
+  private func getMainNeuron() : async T.FullNeuronResult {
     let ?mainNeuron = Operations.mainNeuronId(_operationHistory) else return #err("Main neuron ID not found");
 
-    switch (await IcpGovernance.get_neuron_info(mainNeuron)) {
-      case (#Ok neuron) {
-        return #ok(neuron);
+    switch (await IcpGovernance.get_neuron_info(mainNeuron), await IcpGovernance.get_full_neuron(mainNeuron)) {
+      case (#Ok neuronInfo, #Ok neuron) {
+        return #ok({
+          age_seconds = neuronInfo.age_seconds;
+          created_timestamp_seconds = neuronInfo.created_timestamp_seconds;
+          dissolve_delay_seconds = neuronInfo.dissolve_delay_seconds;
+          joined_community_fund_timestamp_seconds = neuronInfo.joined_community_fund_timestamp_seconds;
+          known_neuron_data = neuronInfo.known_neuron_data;
+          recent_ballots = neuronInfo.recent_ballots;
+          retrieved_at_timestamp_seconds = neuronInfo.retrieved_at_timestamp_seconds;
+          stake_e8s = neuronInfo.stake_e8s;
+          state = neuronInfo.state;
+          voting_power = neuronInfo.voting_power;
+          account = neuron.account;
+          aging_since_timestamp_seconds = neuron.aging_since_timestamp_seconds;
+          cached_neuron_stake_e8s = neuron.cached_neuron_stake_e8s;
+          controller = neuron.controller;
+          dissolve_state = neuron.dissolve_state;
+          followees = neuron.followees;
+          hot_keys = neuron.hot_keys;
+          id = neuron.id;
+          kyc_verified = neuron.kyc_verified;
+          maturity_e8s_equivalent = neuron.maturity_e8s_equivalent;
+          neuron_fees_e8s = neuron.neuron_fees_e8s;
+          not_for_profit = neuron.not_for_profit;
+          spawn_at_timestamp_seconds = neuron.spawn_at_timestamp_seconds;
+          transfer = neuron.transfer;
+        });
       };
-      case (#Err error) {
-        return #err(debug_show error);
-      };
-    };
-  };
-
-  private func getMainNeuron() : async T.MainNeuronResult {
-    let ?mainNeuron = Operations.mainNeuronId(_operationHistory) else return #err("Main neuron ID not found");
-
-    switch (await IcpGovernance.get_full_neuron(mainNeuron)) {
-      case (#Ok neuron) {
-        return #ok(neuron);
-      };
-      case (#Err error) {
-        return #err(debug_show error);
+      case _ {
+        return #err("Failed to fetch main neuron information");
       };
     };
   };

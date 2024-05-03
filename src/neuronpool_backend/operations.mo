@@ -2,7 +2,9 @@ import T "./types";
 import Int "mo:base/Int";
 import Time "mo:base/Time";
 import Nat64 "mo:base/Nat64";
+import Nat "mo:base/Nat";
 import Principal "mo:base/Principal";
+import Array "mo:base/Array";
 import Vector "mo:vector";
 import VectorClass "mo:vector/Class";
 
@@ -93,4 +95,19 @@ module {
         return false;
     };
 
+    public func getOperationHistory(history : T.OperationHistory, start : Nat, length : Nat) : T.HistoryResult {
+        let total = Vector.size(history);
+        // if less entries available than requested length use that
+        let realLength = Nat.min(length, if (start > total) 0 else total - start);
+
+        let operations = Array.tabulate<?T.Operation>(
+            realLength,
+            func(i) {
+                let index = start + i;
+                return Vector.getOpt(history, index);
+            },
+        );
+
+        return #ok({ total; operations });
+    };
 };

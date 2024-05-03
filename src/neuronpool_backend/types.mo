@@ -8,13 +8,15 @@ module {
 
     public type CanisterAccountsResult = Result<CanisterAccounts, ()>;
 
-    public type MainNeuronInfoResult = Result<IcpGovernanceInterface.NeuronInfo, Text>;
-
-    public type MainNeuronResult = Result<IcpGovernanceInterface.Neuron, Text>;
+    public type FullNeuronResult = Result<FullNeuron, Text>;
 
     public type OperationResponse = Result<OperationIndex, Text>;
 
     public type ConfigurationResponse = Result<(), Text>;
+
+    public type HistoryResult = Result<History, ()>;
+
+    public type FullNeuron = IcpGovernanceInterface.NeuronInfo and IcpGovernanceInterface.Neuron;
 
     public type NeuronId = Nat64;
 
@@ -64,6 +66,11 @@ module {
         account_identifier : Text;
         icrc1_identifier : Text;
         balance : Nat;
+    };
+
+    public type History = {
+        total : Nat;
+        operations : [?Operation]
     };
 
 };

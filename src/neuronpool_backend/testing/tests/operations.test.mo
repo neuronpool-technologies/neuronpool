@@ -221,3 +221,62 @@ suite("test multiple users performing many actions", func() {
     });
 
 });
+
+suite("test getting operation history", func() {
+    
+    let _mockOperationHistory : T.OperationHistory = Vector.new<T.Operation>();
+
+    let mockPrincipal : Principal = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
+    let mockAmount : Nat64 = 100_000_000;
+    let mockNeuronId : Nat64 = 4829694856491667492;
+
+    // log 100 operations
+    for(i in Iter.range(0, 99)){
+        if (i % 2 == 0) {
+            ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
+                staker = mockPrincipal;
+                amount_e8s = mockAmount;
+            }));
+        } else {
+            ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({
+                staker = mockPrincipal;
+                amount_e8s = mockAmount;
+                neuron_id = mockNeuronId;
+            }));
+        }
+    };
+
+    let #ok({ total; operations }) = Operations.getOperationHistory(_mockOperationHistory, 0, 10) else return assert (false);
+
+    test("fetches correct amount of operations", func() {
+        expect.nat(operations.size()).equal(10);
+    });
+
+    test("correct calculation of real length", func() {
+        switch(Operations.getOperationHistory(_mockOperationHistory, total - 5, 10)){
+            case(#ok({ total; operations })){
+                expect.nat(operations.size()).equal(5)
+            };
+            case _ { return assert (false) }
+        };
+    });
+    
+    test("returns empty if less entries available than requested length", func() {
+        switch(Operations.getOperationHistory(_mockOperationHistory, total, 10)){
+            case(#ok({ total; operations })){
+                expect.nat(operations.size()).equal(0)
+            };
+            case _ { return assert (false) }
+        };
+    });
+
+    test("returns all entries", func() {
+        switch(Operations.getOperationHistory(_mockOperationHistory, 0, total)){
+            case(#ok({ total; operations })){
+                expect.nat(operations.size()).equal(total)
+            };
+            case _ { return assert (false) }
+        };
+    });
+
+});

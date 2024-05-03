@@ -3,6 +3,7 @@ import Blob "mo:base/Blob";
 import Nat64 "mo:base/Nat64";
 import Option "mo:base/Option";
 import Random "mo:base/Random";
+import Timer "mo:base/Timer";
 import Text "mo:base/Text";
 import Prize "./prize";
 import Stats "./stats";
@@ -34,6 +35,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
   // 1 ICP in e8s
   let ONE_ICP : Nat64 = 100_000_000;
+
+  // The refresh rate of checking if rewards are ready to spawn
+  let SPAWN_REWARD_TIMER_DURATION_NANOS : Nat64 = (24 * 60 * 60 * 1_000_000_000); // 24 hours
 
   // 0.1 ICP in e8s
   let MINIMUM_STAKE : Nat64 = 10_000_000;
@@ -94,7 +98,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     return Operations.getStakerWithdrawalNeurons(_operationHistory, caller);
   };
 
-  public query func get_operation_history({ start : Nat; length : Nat}) : async T.HistoryResult {
+  public query func get_operation_history({ start : Nat; length : Nat }) : async T.HistoryResult {
     return Operations.getOperationHistory(_operationHistory, start, length);
   };
 
@@ -116,12 +120,17 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     return await setNeuronDissolveDelay();
   };
 
-  public shared ({ caller }) func contoller_set_governance_following({
+  public shared ({ caller }) func controller_set_governance_following({
     topic : Int32;
     followee : ?T.NeuronId;
   }) : async T.ConfigurationResponse {
     assert (caller == owner);
     return await setGovernanceFollowing(topic, followee);
+  };
+
+  public shared ({ caller }) func controller_set_spawn_reward_timer() : async T.OperationResponse {
+    assert (caller == owner);
+    return setSpawnRewardTimer<system>();
   };
 
   /////////////////////////
@@ -406,6 +415,8 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
       return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to find a winner" }));
     };
 
+    // the neuron is controlled by the winner
+    // so it won't appear as part of the canister controlled neurons
     let { command } = await IcpGovernance.manage_neuron({
       id = ?{ id = mainNeuron };
       neuron_id_or_subaccount = null;
@@ -434,6 +445,23 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to spawn. " # debug_show commandList }));
       };
     };
+  };
+
+  private func setSpawnRewardTimer<system>() : T.OperationResponse {
+    let oldTimer = Operations.getLatestRewardTimer(_operationHistory);
+
+    // safety cancel
+    switch (oldTimer) {
+      case (?{ timer_id }) { Timer.cancelTimer(timer_id) };
+      case _ {};
+    };
+
+    let newTimerId = Timer.recurringTimer<system>(
+      #nanoseconds(Nat64.toNat(SPAWN_REWARD_TIMER_DURATION_NANOS)),
+      spawnRandomReward,
+    );
+
+    return #ok(Operations.logOperation(_operationHistory, #RewardTimer({ timer_id = newTimerId; timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS })));
   };
 
   private func getMainNeuron() : async T.FullNeuronResult {

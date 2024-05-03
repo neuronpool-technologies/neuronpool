@@ -26,7 +26,7 @@ module {
 
     public type Operation = {
         action : Action;
-        timestamp : Nat64;
+        timestamp_nanos : Nat64;
     };
 
     public type Action = {
@@ -34,6 +34,7 @@ module {
         #StakeWithdrawal : StakeWithdrawal;
         #SpawnReward : SpawnReward;
         #CreateNeuron : CreateNeuron;
+        #RewardTimer : RewardTimer;
         #Error : Error;
     };
 
@@ -51,6 +52,11 @@ module {
     public type SpawnReward = {
         winner : Principal;
         neuron_id : NeuronId;
+    };
+
+    public type RewardTimer = {
+        timer_id : Nat;
+        timer_duration_nanos : Nat64;
     };
 
     public type Error = {

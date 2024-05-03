@@ -15,7 +15,7 @@ module {
             history,
             {
                 action = action;
-                timestamp = Time.now() |> Int.abs(_) |> Nat64.fromNat(_);
+                timestamp_nanos = Time.now() |> Int.abs(_) |> Nat64.fromNat(_);
             },
         );
 
@@ -68,11 +68,6 @@ module {
                         filtered.add(args.neuron_id);
                     };
                 };
-                case (#SpawnReward(args)) {
-                    if (Principal.equal(caller, args.winner)) {
-                        filtered.add(args.neuron_id);
-                    };
-                };
                 case _ { /* do nothing */ };
             };
         };
@@ -110,4 +105,18 @@ module {
 
         return #ok({ total; operations });
     };
+
+    public func getLatestRewardTimer(history : T.OperationHistory) : ?T.RewardTimer {
+        for (op in Vector.valsRev(history)) {
+            switch (op.action) {
+                case (#RewardTimer(args)) {
+                    return ?args;
+                };
+                case _ { /* do nothing */ };
+            };
+        };
+
+        return null;
+    };
+
 };

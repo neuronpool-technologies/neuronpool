@@ -4,6 +4,7 @@ import Vector "mo:vector";
 import Principal "mo:base/Principal";
 import Iter "mo:base/Iter";
 import Nat64 "mo:base/Nat64";
+import Nat "mo:base/Nat";
 import Operations "../../operations";
 
 suite("test logging operations", func() {
@@ -252,6 +253,12 @@ suite("test getting operation history", func() {
         expect.nat(operations.size()).equal(10);
     });
 
+    test("operations are not null", func() {
+        for(op in operations.vals()){
+            expect.bool(op == null).isFalse();
+        };
+    });
+
     test("correct calculation of real length", func() {
         switch(Operations.getOperationHistory(_mockOperationHistory, total - 5, 10)){
             case(#ok({ total; operations })){
@@ -277,6 +284,32 @@ suite("test getting operation history", func() {
             };
             case _ { return assert (false) }
         };
+    });
+
+});
+
+suite("test getting latest reward timer", func() {
+    
+    let _mockOperationHistory : T.OperationHistory = Vector.new<T.Operation>();
+
+    let SPAWN_REWARD_TIMER_DURATION_NANOS : Nat64 = (24 * 60 * 60 * 1_000_000_000); // 24 hours
+
+        
+    test("returns null timer", func() {
+        let timer = Operations.getLatestRewardTimer(_mockOperationHistory);
+        
+        expect.bool(timer == null).isTrue();
+    });
+
+    test("returns latest timer", func() {
+        // log 10 timer
+        for(i in Iter.range(1, 10)){
+            ignore Operations.logOperation(_mockOperationHistory, #RewardTimer({ timer_id = i; timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS }))
+        };
+
+        let ?{ timer_id } = Operations.getLatestRewardTimer(_mockOperationHistory);
+
+        expect.option(?timer_id, Nat.toText, Nat.equal).equal(?10);
     });
 
 });

@@ -1,10 +1,10 @@
 import Bench "mo:bench";
 import Nat "mo:base/Nat";
-import T "../../types";
+import T "../../src/types";
 import Iter "mo:base/Iter";
 import Principal "mo:base/Principal";
 import Vector "mo:vector";
-import Operations "../../operations";
+import Operations "../../src/operations";
 
 module {
     public func init() : Bench.Bench {

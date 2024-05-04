@@ -1,13 +1,13 @@
 import { test; expect; suite } "mo:test/async";
-import T "../../types";
+import T "../../src/types";
 import Vector "mo:vector";
 import Principal "mo:base/Principal";
 import Nat64 "mo:base/Nat64";
 import Debug "mo:base/Debug";
-import Operations "../../operations";
+import Operations "../../src/operations";
 import Iter "mo:base/Iter";
-import Prize "../../prize";
-import Stats "../../stats";
+import Prize "../../src/prize";
+import Stats "../../src/stats";
 
 await suite("test generating a random threshold", func() : async() {
 

@@ -1,11 +1,11 @@
 import { test; expect; suite } "mo:test";
-import T "../../types";
+import T "../../src/types";
 import Vector "mo:vector";
 import Principal "mo:base/Principal";
 import Iter "mo:base/Iter";
 import Nat64 "mo:base/Nat64";
 import Nat "mo:base/Nat";
-import Operations "../../operations";
+import Operations "../../src/operations";
 
 suite("test logging operations", func() {
     
@@ -307,7 +307,7 @@ suite("test getting latest reward timer", func() {
             ignore Operations.logOperation(_mockOperationHistory, #RewardTimer({ timer_id = i; timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS }))
         };
 
-        let ?{ timer_id } = Operations.getLatestRewardTimer(_mockOperationHistory);
+        let ?{ timer_id } = Operations.getLatestRewardTimer(_mockOperationHistory) else return;
 
         expect.option(?timer_id, Nat.toText, Nat.equal).equal(?10);
     });

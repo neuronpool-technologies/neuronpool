@@ -1,11 +1,11 @@
 import { test; expect; suite } "mo:test";
-import T "../../types";
+import T "../../src/types";
 import Vector "mo:vector";
 import Principal "mo:base/Principal";
 import Iter "mo:base/Iter";
 import Nat64 "mo:base/Nat64";
-import Operations "../../operations";
-import Stats "../../stats";
+import Operations "../../src/operations";
+import Stats "../../src/stats";
 
 suite("test computing stats under high usage", func() {
 

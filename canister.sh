@@ -3,7 +3,6 @@
 # 
 
 # dfx deploy --network ic neuronpool
-# dfx deploy --network ic neuronpool_frontend
 # dfx canister --network ic install --mode reinstall neuronpool
 # dfx canister --network ic status neuronpool
 

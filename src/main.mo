@@ -421,7 +421,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
       id = ?{ id = mainNeuron };
       neuron_id_or_subaccount = null;
       command = ? #Spawn({
-        percentage_to_spawn = null;
+        percentage_to_spawn = null; // TODO calculate a percentage to spawn don't spawn full
         new_controller = ?winner;
         nonce = null;
       });

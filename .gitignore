@@ -16,11 +16,6 @@
 # rust
 target/
 
-# frontend code
-node_modules/
-dist/
-.svelte-kit/
-
 # identity
 .identity
 

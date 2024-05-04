@@ -25,6 +25,7 @@ suite("test computing stats under high usage", func() {
     ];
     let mockPrincipal : Principal = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
     let mockNeuronId : Nat64 = 4829694856491667492;
+    let mockBlockchainFee : Nat64 = 10_000;
 
     test("accurate total stake amount with many actions", func() {
 
@@ -36,6 +37,7 @@ suite("test computing stats under high usage", func() {
                     ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                         staker = Principal.fromText(mockPrincipal);
                         amount_e8s = mockAmount;
+                        blockchain_fee = mockBlockchainFee;
                     }));
                 };
 
@@ -51,6 +53,7 @@ suite("test computing stats under high usage", func() {
                         staker = Principal.fromText(mockPrincipal);
                         amount_e8s = mockAmount;
                         neuron_id = mockNeuronId;
+                        blockchain_fee = mockBlockchainFee;
                     }));
                 };
 
@@ -74,6 +77,7 @@ suite("test computing stats under high usage", func() {
                 ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                     staker = Principal.fromText(mockPrincipal);
                     amount_e8s = mockAmount;
+                    blockchain_fee = mockBlockchainFee;
                 }));
             };
         };
@@ -101,6 +105,7 @@ suite("test computing current stakers under high usage", func() {
     ];
     let mockPrincipal : Principal = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
     let mockNeuronId : Nat64 = 4829694856491667492;
+    let mockBlockchainFee : Nat64 = 10_000;
 
     test("accurate current stakers with many actions", func() {
         // simulate over a 100,000 entries (range * array size)
@@ -111,6 +116,7 @@ suite("test computing current stakers under high usage", func() {
                     ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                         staker = Principal.fromText(mockPrincipal);
                         amount_e8s = mockAmount;
+                        blockchain_fee = mockBlockchainFee;
                     }));
                 };
 
@@ -126,6 +132,7 @@ suite("test computing current stakers under high usage", func() {
                         staker = Principal.fromText(mockPrincipal);
                         amount_e8s = mockAmount;
                         neuron_id = mockNeuronId;
+                        blockchain_fee = mockBlockchainFee;
                     }));
                 };
 

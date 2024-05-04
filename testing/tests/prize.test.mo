@@ -13,6 +13,7 @@ await suite("test generating a random threshold", func() : async() {
 
     let mockPrincipal : Principal = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
     let mockAmount : Nat64 = 100_000_000;
+    let mockBlockchainFee : Nat64 = 10_000;
 
     await test("random threshold is not null", func() : async() {
 
@@ -23,6 +24,7 @@ await suite("test generating a random threshold", func() : async() {
             ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                 staker = mockPrincipal;
                 amount_e8s = mockAmount;
+                blockchain_fee = mockBlockchainFee;
             }));
         };
 
@@ -39,6 +41,7 @@ await suite("test generating a random threshold", func() : async() {
             ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                 staker = mockPrincipal;
                 amount_e8s = mockAmount;
+                blockchain_fee = mockBlockchainFee;
             }));
         };
 
@@ -58,6 +61,7 @@ await suite("test generating a random threshold", func() : async() {
             ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                 staker = mockPrincipal;
                 amount_e8s = mockAmount;
+                blockchain_fee = mockBlockchainFee;
             }));
         };
 
@@ -77,6 +81,7 @@ await suite("test generating a random threshold", func() : async() {
             ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                 staker = mockPrincipal;
                 amount_e8s = mockAmount;
+                blockchain_fee = mockBlockchainFee;
             }));
         };
 
@@ -111,6 +116,7 @@ await suite("test weighted selection algorithm", func() : async() {
             ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                 staker = Principal.fromText(mockPrincipal);
                 amount_e8s = mockAmount;
+                blockchain_fee = 10_000;
             }));
         };
 
@@ -142,6 +148,7 @@ await suite("test weighted selection algorithm", func() : async() {
                 ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                     staker = Principal.fromText(mockPrincipal);
                     amount_e8s = mockAmount;
+                    blockchain_fee = 10_000;
                 }));
             };
         };

@@ -48,7 +48,7 @@ module {
                 };
                 case (#StakeWithdrawal(args)) {
                     if (Principal.equal(caller, args.staker)) {
-                        sum -= args.amount_e8s;
+                        sum -= args.amount_e8s + args.blockchain_fee;
                     };
                 };
                 case _ { /* do nothing */ };

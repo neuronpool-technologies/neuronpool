@@ -14,13 +14,15 @@ suite("test logging operations", func() {
     let mockPrincipal : Principal = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
     let mockAmount : Nat64 = 100_000_000;
     let mockNeuronId : Nat64 = 4829694856491667492;
+    let mockBlockchainFee : Nat64 = 10_000;
 
     test("log an operation", func() {
         expect.nat(Vector.size(_mockOperationHistory)).equal(0);
 
         ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
             staker = mockPrincipal;
-            amount_e8s = mockAmount
+            amount_e8s = mockAmount;
+            blockchain_fee = mockBlockchainFee;
         }));
 
         expect.nat(Vector.size(_mockOperationHistory)).equal(1);
@@ -32,12 +34,14 @@ suite("test logging operations", func() {
                 ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                     staker = mockPrincipal;
                     amount_e8s = mockAmount;
+                    blockchain_fee = mockBlockchainFee;
                 }));
             } else {
                 ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({
                     staker = mockPrincipal;
                     amount_e8s = mockAmount;
                     neuron_id = mockNeuronId;
+                    blockchain_fee = mockBlockchainFee;
                 }));
             }
         };
@@ -54,21 +58,27 @@ suite("test stake and withdrawal flow", func() {
     let mockPrincipal : Principal = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
     let mockAmount : Nat64 = 100_000_000;
     let mockNeuronId : T.NeuronId = 4829694856491667492;
+    let mockBlockchainFee : Nat64 = 10_000;
 
     test("balance is accurate after transferring", func() {
         ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
             staker = mockPrincipal;
-            amount_e8s = mockAmount
+            amount_e8s = mockAmount;
+            blockchain_fee = mockBlockchainFee;
         }));
 
         expect.nat64(Operations.stakerBalance(_mockOperationHistory, mockPrincipal)).equal(mockAmount)
     });
 
     test("balance is accurate after withdrawing", func() {
+        // neuron pays the fee, so minus it from user amount
+        let amountToWithdraw = mockAmount - mockBlockchainFee;
+
         ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({
             staker = mockPrincipal;
-            amount_e8s = mockAmount;
+            amount_e8s = amountToWithdraw;
             neuron_id = mockNeuronId;
+            blockchain_fee = mockBlockchainFee;
         }));
 
         expect.nat64(Operations.stakerBalance(_mockOperationHistory, mockPrincipal)).equal(0)
@@ -80,12 +90,16 @@ suite("test stake and withdrawal flow", func() {
                 ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                     staker = mockPrincipal;
                     amount_e8s = mockAmount;
+                    blockchain_fee = mockBlockchainFee;
                 }));
             } else {
+                let amountToWithdraw = mockAmount - mockBlockchainFee;
+                        
                 ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({
                     staker = mockPrincipal;
-                    amount_e8s = mockAmount;
+                    amount_e8s = amountToWithdraw;
                     neuron_id = mockNeuronId;
+                    blockchain_fee = mockBlockchainFee;
                 }));
             }
         };
@@ -96,6 +110,7 @@ suite("test stake and withdrawal flow", func() {
             ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                 staker = mockPrincipal;
                 amount_e8s = mockAmount;
+                blockchain_fee = mockBlockchainFee;
             }));
         };
 
@@ -106,10 +121,11 @@ suite("test stake and withdrawal flow", func() {
                 staker = mockPrincipal;
                 amount_e8s = 10_000_000;
                 neuron_id = mockNeuronId;
+                blockchain_fee = mockBlockchainFee;
             }));
         };
 
-        expect.nat64(Operations.stakerBalance(_mockOperationHistory, mockPrincipal)).equal(900_000_000);
+        expect.nat64(Operations.stakerBalance(_mockOperationHistory, mockPrincipal)).equal(900_000_000 - (mockBlockchainFee * 10));
     });
 
     test("correct withdrawal neurons and balance", func() {
@@ -122,24 +138,28 @@ suite("test stake and withdrawal flow", func() {
         ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
             staker = newUser;
             amount_e8s = newUserAmount;
+            blockchain_fee = mockBlockchainFee;
         }));
 
         ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({
             staker = newUser;
             amount_e8s = 100_000_000;
             neuron_id = newWithdrawalNeuron1;
+            blockchain_fee = mockBlockchainFee;
         }));
 
         ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({
             staker = newUser;
             amount_e8s = 100_000_000;
             neuron_id = newWithdrawalNeuron2;
+            blockchain_fee = mockBlockchainFee;
         }));
 
         ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({
             staker = newUser;
             amount_e8s = 100_000_000;
             neuron_id = newWithdrawalNeuron3;
+            blockchain_fee = mockBlockchainFee;
         }));
 
         expect.bool(Operations.assertCallerOwnsNeuron(_mockOperationHistory, newUser, newWithdrawalNeuron1)).isTrue();
@@ -147,7 +167,7 @@ suite("test stake and withdrawal flow", func() {
         expect.bool(Operations.assertCallerOwnsNeuron(_mockOperationHistory, newUser, newWithdrawalNeuron3)).isTrue();
         expect.bool(Operations.assertCallerOwnsNeuron(_mockOperationHistory, newUser, mockNeuronId)).isFalse();
         expect.nat(Operations.getStakerWithdrawalNeurons(_mockOperationHistory, newUser).size()).equal(3);
-        expect.nat64(Operations.stakerBalance(_mockOperationHistory, newUser)).equal(50_000_000);
+        expect.nat64(Operations.stakerBalance(_mockOperationHistory, newUser)).equal(50_000_000 - (mockBlockchainFee * 3));
     });
 
 });
@@ -170,6 +190,7 @@ suite("test multiple users performing many actions", func() {
     ];
     let mockPrincipal : Principal = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
     let mockNeuronId : Nat64 = 4829694856491667492;
+    let mockBlockchainFee : Nat64 = 10_000;
 
     test("high usage and payload (>100,000 operations)", func() {
         // simulate main neuron gets staked
@@ -185,6 +206,7 @@ suite("test multiple users performing many actions", func() {
                     ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                         staker = Principal.fromText(mockPrincipal);
                         amount_e8s = mockAmount;
+                        blockchain_fee = mockBlockchainFee;
                     }));
                 };
 
@@ -196,10 +218,13 @@ suite("test multiple users performing many actions", func() {
             } else {
                 // simulate 10 users withdrawing
                 for((mockPrincipal, mockAmount) in mockPrincipalsAndAmounts.vals()){
+                    let amountToWithdraw = mockAmount - mockBlockchainFee;
+
                     ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({
                         staker = Principal.fromText(mockPrincipal);
-                        amount_e8s = mockAmount;
+                        amount_e8s = amountToWithdraw;
                         neuron_id = mockNeuronId;
+                        blockchain_fee = mockBlockchainFee;
                     }));
                 };
 
@@ -230,6 +255,7 @@ suite("test getting operation history", func() {
     let mockPrincipal : Principal = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
     let mockAmount : Nat64 = 100_000_000;
     let mockNeuronId : Nat64 = 4829694856491667492;
+    let mockBlockchainFee : Nat64 = 10_000;
 
     // log 100 operations
     for(i in Iter.range(0, 99)){
@@ -237,12 +263,14 @@ suite("test getting operation history", func() {
             ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({
                 staker = mockPrincipal;
                 amount_e8s = mockAmount;
+                blockchain_fee = mockBlockchainFee;
             }));
         } else {
             ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({
                 staker = mockPrincipal;
                 amount_e8s = mockAmount;
                 neuron_id = mockNeuronId;
+                blockchain_fee = mockBlockchainFee;
             }));
         }
     };

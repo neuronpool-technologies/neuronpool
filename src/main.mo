@@ -156,8 +156,8 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
     let amountToStake = Nat64.fromNat(allowance) - ICP_PROTOCOL_FEE; // allowance >= amount + fee
 
-    switch (await IcpGovernance.get_full_neuron(mainNeuron)) {
-      case (#Ok { account }) {
+    switch (await getMainNeuron()) {
+      case (#ok { account }) {
         let transferResult = await IcpLedger.icrc2_transfer_from({
           to = {
             owner = Principal.fromActor(IcpGovernance); // NNS canister
@@ -179,6 +179,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                 #StakeTransfer({
                   staker = caller;
                   amount_e8s = amountToStake;
+                  blockchain_fee = ICP_PROTOCOL_FEE;
                 }),
               )
             );
@@ -188,7 +189,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
           };
         };
       };
-      case (#Err error) {
+      case (#err error) {
         return #err(debug_show error);
       };
     };
@@ -203,10 +204,12 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
     if (balance >= amount) {
       // neuron pays the fee, so minus it from user amount
+      let amountToWithdraw = amount - ICP_PROTOCOL_FEE;
+
       let { command } = await IcpGovernance.manage_neuron({
         id = ?{ id = mainNeuron };
         neuron_id_or_subaccount = null;
-        command = ? #Split({ amount_e8s = amount - ICP_PROTOCOL_FEE });
+        command = ? #Split({ amount_e8s = amountToWithdraw });
       });
 
       let ?commandList = command else return #err("Failed to split new neuron");
@@ -221,8 +224,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
               _operationHistory,
               #StakeWithdrawal({
                 staker = caller;
-                amount_e8s = amount;
-                neuron_id = id; // neuron balance will be amount - protocol fee
+                amount_e8s = amountToWithdraw;
+                neuron_id = id;
+                blockchain_fee = ICP_PROTOCOL_FEE;
               }),
             )
           );
@@ -403,6 +407,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     let ?mainNeuron = Operations.mainNeuronId(_operationHistory) else {
       return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Main neuron ID not found" }));
     };
+
+    // TODO Check maturity
+    // TODO check maturity function
 
     // Calculate total stake amount for generating random threshold
     let totalAmount = Stats.getTotalStakeAmount(_operationHistory);

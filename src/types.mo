@@ -41,12 +41,14 @@ module {
     public type StakeTransfer = {
         staker : Principal;
         amount_e8s : Nat64;
+        blockchain_fee : Nat64;
     };
 
     public type StakeWithdrawal = {
         staker : Principal;
         amount_e8s : Nat64;
         neuron_id : NeuronId;
+        blockchain_fee : Nat64;
     };
 
     public type SpawnReward = {

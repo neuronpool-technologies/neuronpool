@@ -36,11 +36,17 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   // 1 ICP in e8s
   let ONE_ICP : Nat64 = 100_000_000;
 
-  // The refresh rate of checking if rewards are ready to spawn
-  let SPAWN_REWARD_TIMER_DURATION_NANOS : Nat64 = (24 * 60 * 60 * 1_000_000_000); // 24 hours
-
   // 0.1 ICP in e8s
   let MINIMUM_STAKE : Nat64 = 10_000_000;
+
+  // 1.06 ICP in e8s
+  let MINIMUM_SPAWN : Nat64 = 106_000_000;
+
+  // The fee paid to the smart contract (held as maturity)
+  // let PROTOCOL_FEE : Nat = 3; // 3%
+
+  // The refresh rate of checking if rewards are ready to spawn
+  let SPAWN_REWARD_TIMER_DURATION_NANOS : Nat64 = (24 * 60 * 60 * 1_000_000_000); // 24 hours
 
   // The canister controlled neuron will follow this neuron on all votes
   let DEFAULT_NEURON_FOLLOWEE : T.NeuronId = 6914974521667616512; // Rakeoff.io named neuron
@@ -51,6 +57,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   // If this limit is reached we don't allow any more stakeTransfers
   // All other operations are allowed to continue
   let OPERATION_HISTORY_LIMIT : Nat = 100_000;
+
+  // Protocol fee percentage
+  let PROTOCOL_FEE_PERCENTAGE : Nat64 = 3;
 
   //////////////////////
   /// Canister State ///
@@ -102,6 +111,14 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     return Operations.getOperationHistory(_operationHistory, start, length);
   };
 
+  public query func get_minimum_stake() : async Nat64 {
+    return MINIMUM_STAKE + ICP_PROTOCOL_FEE;
+  };
+
+  public query func get_minimum_withdrawal() : async Nat64 {
+    return ONE_ICP + ICP_PROTOCOL_FEE;
+  };
+
   public func get_canister_accounts() : async T.CanisterAccountsResult {
     return await getCanisterAccounts();
   };
@@ -138,8 +155,6 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   /////////////////////////
 
   private func initiateIcpStakeTransfer(caller : Principal) : async T.OperationResponse {
-    let ?mainNeuron = Operations.mainNeuronId(_operationHistory) else return #err("Main neuron ID not found");
-
     if (Vector.size(_operationHistory) >= OPERATION_HISTORY_LIMIT) {
       return #err("The operation history has reached its limit of " # debug_show OPERATION_HISTORY_LIMIT # " No additional stake transfers can be processed at this time.");
     };
@@ -232,7 +247,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
           );
         };
         case _ {
-          return #err("Failed to stake. " # debug_show commandList);
+          return #err("Failed to split new neuron. " # debug_show commandList);
         };
       };
     } else {
@@ -278,7 +293,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     switch (commandList) {
       case (#Disburse _) { return #ok() };
       case _ {
-        return #err("Failed to start dissolving neuron. " # debug_show commandList);
+        return #err("Failed to disburse neuron. " # debug_show commandList);
       };
     };
   };
@@ -349,8 +364,8 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   private func setNeuronDissolveDelay() : async T.ConfigurationResponse {
     let ?mainNeuron = Operations.mainNeuronId(_operationHistory) else return #err("Main neuron ID not found");
 
-    switch (await IcpGovernance.get_neuron_info(mainNeuron)) {
-      case (#Ok { dissolve_delay_seconds }) {
+    switch (await getMainNeuron()) {
+      case (#ok { dissolve_delay_seconds }) {
         if (dissolve_delay_seconds > 0) return #err("Dissolve delay already set");
 
         let { command } = await IcpGovernance.manage_neuron({
@@ -372,7 +387,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
           };
         };
       };
-      case (#Err error) {
+      case (#err error) {
         return #err(debug_show error);
       };
     };
@@ -402,14 +417,15 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
   };
 
   // Timer function
-  // TODO only call this when maturity is above 1 ICP
+  // TODO unit tests on calculations
   private func spawnRandomReward() : async () {
     let ?mainNeuron = Operations.mainNeuronId(_operationHistory) else {
       return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Main neuron ID not found" }));
     };
 
-    // TODO Check maturity
-    // TODO check maturity function
+    let { total_maturity; available_maturity; protocol_fee } = await checkAvailableMaturity();
+
+    if (available_maturity < MINIMUM_SPAWN) return; // TODO log this?
 
     // Calculate total stake amount for generating random threshold
     let totalAmount = Stats.getTotalStakeAmount(_operationHistory);
@@ -428,7 +444,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
       id = ?{ id = mainNeuron };
       neuron_id_or_subaccount = null;
       command = ? #Spawn({
-        percentage_to_spawn = null; // TODO calculate a percentage to spawn don't spawn full
+        percentage_to_spawn = ?Nat64.toNat32((available_maturity * 100) / total_maturity);
         new_controller = ?winner;
         nonce = null;
       });
@@ -446,7 +462,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         };
 
         // store the staked neuron in the log
-        return ignore Operations.logOperation(_operationHistory, #SpawnReward({ winner = winner; neuron_id = id }));
+        return ignore Operations.logOperation(_operationHistory, #SpawnReward({ winner = winner; neuron_id = id; protocol_maturity_e8s = protocol_fee }));
       };
       case _ {
         return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to spawn. " # debug_show commandList }));
@@ -469,6 +485,29 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     );
 
     return #ok(Operations.logOperation(_operationHistory, #RewardTimer({ timer_id = newTimerId; timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS })));
+  };
+
+  private func checkAvailableMaturity() : async {
+    total_maturity : Nat64;
+    available_maturity : Nat64;
+    protocol_fee : Nat64;
+  } {
+    switch (await getMainNeuron()) {
+      case (#ok { maturity_e8s_equivalent }) {
+        let nonFeeMaturity = maturity_e8s_equivalent - Operations.getTotalProtocolFees(_operationHistory);
+
+        let thisRoundsFee = (nonFeeMaturity * PROTOCOL_FEE_PERCENTAGE) / 100;
+
+        return {
+          total_maturity = maturity_e8s_equivalent;
+          available_maturity = nonFeeMaturity - thisRoundsFee; // this needs to be greater than 1.06 to spawn
+          protocol_fee = thisRoundsFee;
+        };
+      };
+      case (#err _) {
+        return { total_maturity = 0; available_maturity = 0; protocol_fee = 0 };
+      };
+    };
   };
 
   private func getMainNeuron() : async T.FullNeuronResult {

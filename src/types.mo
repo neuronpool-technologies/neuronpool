@@ -42,6 +42,7 @@ module {
         staker : Principal;
         amount_e8s : Nat64;
         blockchain_fee : Nat64;
+        // royalty_fee : ?RoyaltyFee;
     };
 
     public type StakeWithdrawal = {
@@ -54,6 +55,7 @@ module {
     public type SpawnReward = {
         winner : Principal;
         neuron_id : NeuronId;
+        protocol_maturity_e8s : Nat64;
     };
 
     public type RewardTimer = {
@@ -65,6 +67,11 @@ module {
         function : Text;
         message : Text;
     };
+
+    // public type RoyaltyFee = {
+    //     address : Text;
+    //     fee_e8s : Nat64;
+    // };
 
     public type CreateNeuron = {
         neuron_id : Nat64;

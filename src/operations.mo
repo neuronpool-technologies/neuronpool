@@ -119,4 +119,18 @@ module {
         return null;
     };
 
+    public func getTotalProtocolFees(history : T.OperationHistory) : Nat64 {
+        var sum : Nat64 = 0;
+        for (op in Vector.vals(history)) {
+            switch (op.action) {
+                case (#SpawnReward(args)) {
+                    sum += args.protocol_maturity_e8s;
+                };
+                case _ { /* do nothing */ };
+            };
+        };
+
+        return sum;
+    };
+
 };

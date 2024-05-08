@@ -425,7 +425,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
     let { total_maturity; available_maturity; protocol_fee } = await checkAvailableMaturity();
 
-    if (available_maturity < MINIMUM_SPAWN) return; // TODO log this?
+    if (available_maturity < MINIMUM_SPAWN) {
+      return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Insufficient available maturity to spawn reward" }));
+    };
 
     // Calculate total stake amount for generating random threshold
     let totalAmount = Stats.getTotalStakeAmount(_operationHistory);

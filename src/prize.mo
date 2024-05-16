@@ -1,12 +1,12 @@
 import Random "mo:base/Random";
 import Nat64 "mo:base/Nat64";
-import Stats "./stats";
+import Operations "./operations";
 import T "./types";
 
 module {
 
     public func weightedSelection(history : T.OperationHistory, randomThreshold : Nat64) : ?Principal {
-        let currentStakers = Stats.getCurrentStakers(history);
+        let currentStakers = Operations.getCurrentStakers(history);
 
         var runningSum : Nat64 = 0;
         for ((staker, amount) in currentStakers.vals()) {

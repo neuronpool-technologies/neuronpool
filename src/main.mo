@@ -6,7 +6,6 @@ import Random "mo:base/Random";
 import Timer "mo:base/Timer";
 import Text "mo:base/Text";
 import Prize "./prize";
-import Stats "./stats";
 import Operations "./operations";
 import T "./types";
 import Sha256 "mo:sha2/Sha256";
@@ -430,7 +429,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     };
 
     // Calculate total stake amount for generating random threshold
-    let totalAmount = Stats.getTotalStakeAmount(_operationHistory);
+    let totalAmount = Operations.getTotalStakeAmount(_operationHistory);
 
     let ?randomNumber = await Prize.generateRandomThreshold(totalAmount) else {
       return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to generate random threshold" }));

@@ -1,6 +1,6 @@
 import Result "mo:base/Result";
 import Vector "mo:vector";
-import IcpGovernanceInterface "interfaces/governance_interface";
+import NeuroTypes "mo:neuro/types";
 
 module {
 
@@ -8,17 +8,11 @@ module {
 
     public type CanisterAccountsResult = Result<CanisterAccounts, ()>;
 
-    public type FullNeuronResult = Result<FullNeuron, Text>;
-
     public type OperationResponse = Result<OperationIndex, Text>;
-
-    public type ConfigurationResponse = Result<(), Text>;
 
     public type HistoryResult = Result<History, ()>;
 
-    public type FullNeuron = IcpGovernanceInterface.NeuronInfo and IcpGovernanceInterface.Neuron;
-
-    public type NeuronId = Nat64;
+    public type NeuronId = NeuroTypes.NnsNeuronId;
 
     public type OperationIndex = Nat;
 
@@ -55,7 +49,7 @@ module {
     public type SpawnReward = {
         winner : Principal;
         neuron_id : NeuronId;
-        protocol_maturity_e8s : Nat64;
+        protocol_maturity_fee_e8s : Nat64;
     };
 
     public type RewardTimer = {
@@ -75,6 +69,7 @@ module {
 
     public type CreateNeuron = {
         neuron_id : Nat64;
+        token : Text;
     };
 
     public type CanisterAccounts = {

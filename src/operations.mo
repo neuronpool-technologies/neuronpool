@@ -8,6 +8,7 @@ import Array "mo:base/Array";
 import Vector "mo:vector";
 import Map "mo:map/Map";
 import VectorClass "mo:vector/Class";
+import Debug "mo:base/Debug";
 
 module {
 
@@ -23,19 +24,17 @@ module {
         return Vector.size(history);
     };
 
-    public func mainNeuronId(history : T.OperationHistory) : ?T.NeuronId {
+    public func mainNeuronId(history : T.OperationHistory) : T.NeuronId {
         for (op in Vector.vals(history)) {
             switch (op.action) {
                 case (#CreateNeuron { neuron_id }) {
-                    return ?neuron_id;
+                    return neuron_id;
                 };
-                case _ {
-                    return null;
-                };
+                case _ {};
             };
         };
 
-        return null;
+        Debug.trap("Main neuron ID not found");
     };
 
     public func stakerBalance(history : T.OperationHistory, caller : Principal) : Nat64 {
@@ -125,7 +124,7 @@ module {
         for (op in Vector.vals(history)) {
             switch (op.action) {
                 case (#SpawnReward(args)) {
-                    sum += args.protocol_maturity_e8s;
+                    sum += args.protocol_maturity_fee_e8s;
                 };
                 case _ { /* do nothing */ };
             };

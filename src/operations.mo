@@ -75,11 +75,43 @@ module {
         return VectorClass.toArray(filtered);
     };
 
+    public func getStakerPrizeNeurons(history : T.OperationHistory, caller : Principal) : [T.NeuronId] {
+        let filtered = VectorClass.Vector<T.NeuronId>();
+
+        for (op in Vector.vals(history)) {
+            switch (op.action) {
+                case (#SpawnReward(args)) {
+                    if (Principal.equal(caller, args.winner) and VectorClass.contains(filtered, args.neuron_id, Nat64.equal) == false) {
+                        filtered.add(args.neuron_id);
+                    };
+                };
+                case _ { /* do nothing */ };
+            };
+        };
+
+        return VectorClass.toArray(filtered);
+    };
+
     public func assertCallerOwnsNeuron(history : T.OperationHistory, caller : Principal, neuronId : T.NeuronId) : Bool {
         for (op in Vector.vals(history)) {
             switch (op.action) {
                 case (#StakeWithdrawal(args)) {
                     if (Principal.equal(caller, args.staker) and Nat64.equal(neuronId, args.neuron_id)) {
+                        return true;
+                    };
+                };
+                case _ { /* do nothing */ };
+            };
+        };
+
+        return false;
+    };
+
+    public func assertCallerWonPrize(history : T.OperationHistory, caller : Principal, neuronId : T.NeuronId) : Bool {
+        for (op in Vector.vals(history)) {
+            switch (op.action) {
+                case (#SpawnReward(args)) {
+                    if (Principal.equal(caller, args.winner) and Nat64.equal(neuronId, args.neuron_id)) {
                         return true;
                     };
                 };
@@ -117,20 +149,6 @@ module {
         };
 
         return null;
-    };
-
-    public func getTotalProtocolFees(history : T.OperationHistory) : Nat64 {
-        var sum : Nat64 = 0;
-        for (op in Vector.vals(history)) {
-            switch (op.action) {
-                case (#SpawnReward(args)) {
-                    sum += args.protocol_maturity_fee_e8s;
-                };
-                case _ { /* do nothing */ };
-            };
-        };
-
-        return sum;
     };
 
     public func getTotalStakeAmount(history : T.OperationHistory) : Nat64 {

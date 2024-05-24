@@ -10,6 +10,8 @@ module {
 
     public type OperationResponse = Result<OperationIndex, Text>;
 
+    public type ConfigureResponse = NeuroTypes.ConfigureResult;
+    
     public type HistoryResult = Result<History, ()>;
 
     public type NeuronId = NeuroTypes.NnsNeuronId;
@@ -27,6 +29,7 @@ module {
         #StakeTransfer : StakeTransfer;
         #StakeWithdrawal : StakeWithdrawal;
         #SpawnReward : SpawnReward;
+        #DisburseReward : DisburseReward;
         #CreateNeuron : CreateNeuron;
         #RewardTimer : RewardTimer;
         #Error : Error;
@@ -36,7 +39,6 @@ module {
         staker : Principal;
         amount_e8s : Nat64;
         blockchain_fee : Nat64;
-        // royalty_fee : ?RoyaltyFee;
     };
 
     public type StakeWithdrawal = {
@@ -49,7 +51,13 @@ module {
     public type SpawnReward = {
         winner : Principal;
         neuron_id : NeuronId;
-        protocol_maturity_fee_e8s : Nat64;
+    };
+
+    public type DisburseReward = {
+        winner : Principal;
+        neuron_id : NeuronId;
+        amount : Nat64;
+        protocol_fee : Nat64;
     };
 
     public type RewardTimer = {
@@ -61,11 +69,6 @@ module {
         function : Text;
         message : Text;
     };
-
-    // public type RoyaltyFee = {
-    //     address : Text;
-    //     fee_e8s : Nat64;
-    // };
 
     public type CreateNeuron = {
         neuron_id : Nat64;
@@ -80,7 +83,7 @@ module {
 
     public type History = {
         total : Nat;
-        operations : [?Operation]
+        operations : [?Operation];
     };
 
 };

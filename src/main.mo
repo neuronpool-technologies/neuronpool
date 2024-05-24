@@ -50,8 +50,8 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     // All other operations are allowed to continue
     let OPERATION_HISTORY_LIMIT : Nat = 100_000;
 
-    // The fee paid to the smart contract (held as maturity)
-    let PROTOCOL_FEE_PERCENTAGE : Nat64 = 3;
+    // The fee percentage paid to the smart contract
+    let PROTOCOL_FEE_PERCENTAGE : Nat64 = 10; // 10%
 
     //////////////////////
     /// Canister State ///
@@ -77,16 +77,23 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
     public shared ({ caller }) func process_icp_stake_dissolve({
         neuronId : T.NeuronId;
-    }) : async NeuroTypes.ConfigureResult {
+    }) : async T.ConfigureResponse {
         assert (Principal.isAnonymous(caller) == false);
         return await processIcpStakeDissolve(caller, neuronId);
     };
 
     public shared ({ caller }) func process_icp_stake_disburse({
         neuronId : T.NeuronId;
-    }) : async NeuroTypes.ConfigureResult {
+    }) : async T.ConfigureResponse {
         assert (Principal.isAnonymous(caller) == false);
         return await processIcpStakeDisburse(caller, neuronId);
+    };
+
+    public shared ({ caller }) func process_icp_prize_disburse({
+        neuronId : T.NeuronId;
+    }) : async T.OperationResponse {
+        assert (Principal.isAnonymous(caller) == false);
+        return await processIcpPrizeDisburse(caller, neuronId);
     };
 
     public shared query ({ caller }) func get_staker_balance() : async Nat64 {
@@ -97,6 +104,11 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     public shared query ({ caller }) func get_staker_withdrawal_neurons() : async [T.NeuronId] {
         assert (Principal.isAnonymous(caller) == false);
         return Operations.getStakerWithdrawalNeurons(_operationHistory, caller);
+    };
+
+    public shared query ({ caller }) func get_staker_prize_neurons() : async [T.NeuronId] {
+        assert (Principal.isAnonymous(caller) == false);
+        return Operations.getStakerPrizeNeurons(_operationHistory, caller);
     };
 
     ///////////////////////////////////
@@ -110,14 +122,14 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return await stakeMainNeuron(amount_e8s);
     };
 
-    public shared ({ caller }) func controller_set_main_neuron_dissolve_delay() : async NeuroTypes.ConfigureResult {
+    public shared ({ caller }) func controller_set_main_neuron_dissolve_delay() : async T.ConfigureResponse {
         assert (caller == owner);
         return await setMainNeuronDissolveDelay();
     };
 
     public shared ({ caller }) func controller_set_main_neuron_following({
         topic : Int32;
-    }) : async NeuroTypes.ConfigureResult {
+    }) : async T.ConfigureResponse {
         assert (caller == owner);
         return await setMainNeuronFollowing(topic);
     };
@@ -135,6 +147,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return await getCanisterAccounts();
     };
 
+    // can be used to calculate any stats on the frontend:
     public query func get_operation_history({ start : Nat; length : Nat }) : async T.HistoryResult {
         return Operations.getOperationHistory(_operationHistory, start, length);
     };
@@ -246,7 +259,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         };
     };
 
-    private func processIcpStakeDissolve(caller : Principal, neuronId : T.NeuronId) : async NeuroTypes.ConfigureResult {
+    private func processIcpStakeDissolve(caller : Principal, neuronId : T.NeuronId) : async T.ConfigureResponse {
         if (Operations.assertCallerOwnsNeuron(_operationHistory, caller, neuronId) == false) return #err("Failed to find neuron Id for caller: " # debug_show neuronId);
 
         let neuron = NNS.Neuron({
@@ -257,7 +270,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return await neuron.startDissolving();
     };
 
-    private func processIcpStakeDisburse(caller : Principal, neuronId : T.NeuronId) : async NeuroTypes.ConfigureResult {
+    private func processIcpStakeDisburse(caller : Principal, neuronId : T.NeuronId) : async T.ConfigureResponse {
         if (Operations.assertCallerOwnsNeuron(_operationHistory, caller, neuronId) == false) return #err("Failed to find neuron Id for caller: " # debug_show neuronId);
 
         let neuron = NNS.Neuron({
@@ -266,8 +279,75 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         });
 
         return await neuron.disburse({
-            to_account = AccountIdentifier.accountIdentifier(caller, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
+            to_account = ?{
+                hash = AccountIdentifier.accountIdentifier(caller, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
+            };
+            amount = null;
         });
+    };
+
+    private func processIcpPrizeDisburse(caller : Principal, neuronId : T.NeuronId) : async T.OperationResponse {
+        if (Operations.assertCallerWonPrize(_operationHistory, caller, neuronId) == false) return #err("Failed to find prize for caller: " # debug_show neuronId);
+
+        let neuron = NNS.Neuron({
+            nns_canister_id = Principal.fromActor(IcpGovernance);
+            neuron_id = neuronId;
+        });
+
+        switch (await neuron.getInformation()) {
+            case (#ok { cached_neuron_stake_e8s }) {
+                if (cached_neuron_stake_e8s <= ICP_PROTOCOL_FEE) return #err("Insufficient amount to disburse");
+
+                let protocol_fee : Nat64 = (cached_neuron_stake_e8s * PROTOCOL_FEE_PERCENTAGE) / 100;
+
+                // disburse the protocol fee to the canister
+                let disburseFeeResult = await neuron.disburse({
+                    to_account = ?{
+                        hash = Principal.fromActor(thisCanister) |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
+                    };
+                    amount = ?{ e8s = protocol_fee };
+                });
+
+                switch (disburseFeeResult) {
+                    case (#ok _) {
+                        // disburse the rest of the neuron amount to the winner
+                        let disburseWinnerResult = await neuron.disburse({
+                            to_account = ?{
+                                hash = AccountIdentifier.accountIdentifier(caller, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
+                            };
+                            amount = null;
+                        });
+
+                        switch (disburseWinnerResult) {
+                            case (#ok _) {
+                                // log the disbursement if successful
+                                return #ok(
+                                    Operations.logOperation(
+                                        _operationHistory,
+                                        #DisburseReward({
+                                            winner = caller;
+                                            neuron_id = neuronId;
+                                            amount = cached_neuron_stake_e8s;
+                                            protocol_fee = protocol_fee;
+                                        }),
+                                    )
+                                );
+                            };
+                            case (#err _) {
+                                return #err("Failed to complete neuron disbursement. Please try again");
+                            };
+                        };
+                    };
+                    case (#err _) {
+                        return #err("Failed to complete neuron disbursement. Please try again");
+                    };
+                };
+
+            };
+            case (#err error) {
+                return #err(error);
+            };
+        };
     };
 
     ////////////////////////////////////
@@ -294,7 +374,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         };
     };
 
-    private func setMainNeuronDissolveDelay() : async NeuroTypes.ConfigureResult {
+    private func setMainNeuronDissolveDelay() : async T.ConfigureResponse {
         switch (await getMainNeuron()) {
             case (#ok { dissolve_delay_seconds }) {
                 if (dissolve_delay_seconds > 0) return #err("Dissolve delay already set");
@@ -314,7 +394,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         };
     };
 
-    private func setMainNeuronFollowing(topic : Int32) : async NeuroTypes.ConfigureResult {
+    private func setMainNeuronFollowing(topic : Int32) : async T.ConfigureResponse {
         let neuron = NNS.Neuron({
             nns_canister_id = Principal.fromActor(IcpGovernance);
             neuron_id = Operations.mainNeuronId(_operationHistory);
@@ -339,67 +419,43 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return await neuron.getInformation();
     };
 
-    // TODO Check over the flow here and calculations
-    // some helper functions may be needed to seperate logic
     private func spawnPrizeReward() : async () {
-        let { total_maturity; available_maturity; protocol_fee } = await checkAvailableMaturity();
-
-        if (available_maturity < MINIMUM_SPAWN) {
-            return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Insufficient available maturity to spawn reward" }));
-        };
-
-        // Calculate total stake amount for generating random threshold
-        let totalAmount = Operations.getTotalStakeAmount(_operationHistory);
-
-        let ?randomNumber = await Prize.generateRandomThreshold(totalAmount) else {
-            return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to generate random threshold" }));
-        };
-
-        let ?winner = Prize.weightedSelection(_operationHistory, randomNumber) else {
-            return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to find a winner" }));
-        };
-
-        // the neuron is controlled by the winner
-        // so it won't appear as part of the canister controlled neurons
-        let neuron = NNS.Neuron({
-            nns_canister_id = Principal.fromActor(IcpGovernance);
-            neuron_id = Operations.mainNeuronId(_operationHistory);
-        });
-
-        switch (await neuron.spawn({ new_controller = ?winner; percentage_to_spawn = ?Nat64.toNat32((available_maturity * 100) / total_maturity) })) {
-            case (#ok createdNeuronId) {
-                // store the staked neuron in the log
-                return ignore Operations.logOperation(_operationHistory, #SpawnReward({ winner = winner; neuron_id = createdNeuronId; protocol_maturity_fee_e8s = protocol_fee }));
-            };
-            case (#err error) {
-                return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to spawn. " # debug_show error }));
-            };
-        };
-    };
-
-    private func checkAvailableMaturity() : async {
-        total_maturity : Nat64;
-        available_maturity : Nat64;
-        protocol_fee : Nat64;
-    } {
         switch (await getMainNeuron()) {
             case (#ok { maturity_e8s_equivalent }) {
-                let nonFeeMaturity = maturity_e8s_equivalent - Operations.getTotalProtocolFees(_operationHistory);
-
-                let thisRoundsFee = (nonFeeMaturity * PROTOCOL_FEE_PERCENTAGE) / 100;
-
-                return {
-                    total_maturity = maturity_e8s_equivalent;
-                    available_maturity = nonFeeMaturity - thisRoundsFee; // this needs to be greater than 1.06 to spawn
-                    protocol_fee = thisRoundsFee;
+                if (maturity_e8s_equivalent < MINIMUM_SPAWN) {
+                    return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Insufficient available maturity to spawn reward" }));
                 };
+
+                // Calculate total stake amount for generating random threshold
+                let totalAmount = Operations.getTotalStakeAmount(_operationHistory);
+
+                let ?randomNumber = await Prize.generateRandomThreshold(totalAmount) else {
+                    return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to generate random threshold" }));
+                };
+
+                let ?winner = Prize.weightedSelection(_operationHistory, randomNumber) else {
+                    return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to find a winner" }));
+                };
+
+                // the neuron is controlled by the canister
+                let neuron = NNS.Neuron({
+                    nns_canister_id = Principal.fromActor(IcpGovernance);
+                    neuron_id = Operations.mainNeuronId(_operationHistory);
+                });
+
+                switch (await neuron.spawn({ new_controller = null; percentage_to_spawn = null })) {
+                    case (#ok createdNeuronId) {
+                        // store the staked neuron in the log
+                        return ignore Operations.logOperation(_operationHistory, #SpawnReward({ winner = winner; neuron_id = createdNeuronId }));
+                    };
+                    case (#err error) {
+                        return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to spawn. " # debug_show error }));
+                    };
+                };
+
             };
-            case (#err _) {
-                return {
-                    total_maturity = 0;
-                    available_maturity = 0;
-                    protocol_fee = 0;
-                };
+            case (#err error) {
+                return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = error }));
             };
         };
     };

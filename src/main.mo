@@ -243,7 +243,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                             _operationHistory,
                             #StakeWithdrawal({
                                 staker = caller;
-                                amount_e8s = amount_e8s;
+                                amount_e8s = amount_e8s - ICP_PROTOCOL_FEE;
                                 neuron_id = createdNeuronId;
                                 blockchain_fee = ICP_PROTOCOL_FEE;
                             }),
@@ -339,7 +339,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                         };
                     };
                     case (#err _) {
-                        return #err("Failed to complete neuron disbursement. Please try again");
+                        return #err("Failed to process protocol fee. Please try again");
                     };
                 };
 

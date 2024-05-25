@@ -12,6 +12,7 @@ import IcpLedgerInterface "mo:neuro/interfaces/icp_ledger_interface";
 import IcpGovernanceInterface "mo:neuro/interfaces/nns_interface";
 import NeuroTypes "mo:neuro/types";
 import { NNS } "mo:neuro";
+import Prim "mo:⛔";
 
 shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
@@ -142,6 +143,35 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     ////////////////////////////////////
     /// Information Public Functions ///
     ////////////////////////////////////
+
+    // 
+    /* for testing */
+    // 
+    type HeapData = {
+        operation_entries : Nat;
+        heap_bytes : Nat;
+        heap_mb : Nat;
+    };
+
+    public func get_canister_heap_data() : async HeapData {
+        let heap = Prim.rts_heap_size();
+        let kb = heap / 1024;
+        let mb = kb / 1024;
+
+        return {
+            operation_entries = Vector.size(_operationHistory);
+            heap_bytes = heap;
+            heap_mb = mb;
+        };
+    };
+
+    // TODO
+    public func add_mock_data() : async Any {
+        // mock a log operation
+    };
+    //
+    /* for testing */
+    //
 
     public func get_canister_accounts() : async T.CanisterAccountsResult {
         return await getCanisterAccounts();

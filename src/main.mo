@@ -144,9 +144,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     /// Information Public Functions ///
     ////////////////////////////////////
 
-    // 
+    //
     /* for testing */
-    // 
+    //
     type HeapData = {
         operation_entries : Nat;
         heap_bytes : Nat;
@@ -168,6 +168,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     // TODO
     public func add_mock_data() : async Any {
         // mock a log operation
+        
     };
     //
     /* for testing */
@@ -190,8 +191,12 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return ONE_ICP + ICP_PROTOCOL_FEE;
     };
 
+    public func get_neuron_information(neuronId : T.NeuronId) : async NeuroTypes.NnsInformationResult {
+        return await getNeuronInformation(neuronId);
+    };
+
     public func get_main_neuron() : async NeuroTypes.NnsInformationResult {
-        return await getMainNeuron();
+        return await getNeuronInformation(Operations.mainNeuronId(_operationHistory));
     };
 
     //////////////////////////////
@@ -215,7 +220,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
         let amountToStake = Nat64.fromNat(allowance) - ICP_PROTOCOL_FEE; // allowance >= amount + fee
 
-        switch (await getMainNeuron()) {
+        switch (await getNeuronInformation(Operations.mainNeuronId(_operationHistory))) {
             case (#ok { account }) {
                 // TODO may need to refresh neuron
                 let transferResult = await IcpLedger.icrc2_transfer_from({
@@ -345,7 +350,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                             to_account = ?{
                                 hash = AccountIdentifier.accountIdentifier(caller, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
                             };
-                            amount = null;
+                            amount = null; // defaults to 100% of what's left
                         });
 
                         switch (disburseWinnerResult) {
@@ -357,7 +362,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                                         #DisburseReward({
                                             winner = caller;
                                             neuron_id = neuronId;
-                                            amount = cached_neuron_stake_e8s;
+                                            amount = cached_neuron_stake_e8s - protocol_fee;
                                             protocol_fee = protocol_fee;
                                         }),
                                     )
@@ -405,7 +410,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     };
 
     private func setMainNeuronDissolveDelay() : async T.ConfigureResponse {
-        switch (await getMainNeuron()) {
+        switch (await getNeuronInformation(Operations.mainNeuronId(_operationHistory))) {
             case (#ok { dissolve_delay_seconds }) {
                 if (dissolve_delay_seconds > 0) return #err("Dissolve delay already set");
 
@@ -440,32 +445,26 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     /// Canister Private Functions ///
     //////////////////////////////////
 
-    private func getMainNeuron() : async NeuroTypes.NnsInformationResult {
+    private func getNeuronInformation(neuronId : T.NeuronId) : async NeuroTypes.NnsInformationResult {
         let neuron = NNS.Neuron({
             nns_canister_id = Principal.fromActor(IcpGovernance);
-            neuron_id = Operations.mainNeuronId(_operationHistory);
+            neuron_id = neuronId;
         });
 
         return await neuron.getInformation();
     };
 
     private func spawnPrizeReward() : async () {
-        switch (await getMainNeuron()) {
+        switch (await getNeuronInformation(Operations.mainNeuronId(_operationHistory))) {
             case (#ok { maturity_e8s_equivalent }) {
-                if (maturity_e8s_equivalent < MINIMUM_SPAWN) {
-                    return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Insufficient available maturity to spawn reward" }));
-                };
+                if (maturity_e8s_equivalent < MINIMUM_SPAWN) return;
 
                 // Calculate total stake amount for generating random threshold
                 let totalAmount = Operations.getTotalStakeAmount(_operationHistory);
 
-                let ?randomNumber = await Prize.generateRandomThreshold(totalAmount) else {
-                    return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to generate random threshold" }));
-                };
+                let ?randomNumber = await Prize.generateRandomThreshold(totalAmount) else return;
 
-                let ?winner = Prize.weightedSelection(_operationHistory, randomNumber) else {
-                    return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to find a winner" }));
-                };
+                let ?winner = Prize.weightedSelection(_operationHistory, randomNumber) else return;
 
                 // the neuron is controlled by the canister
                 let neuron = NNS.Neuron({
@@ -478,15 +477,11 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                         // store the staked neuron in the log
                         return ignore Operations.logOperation(_operationHistory, #SpawnReward({ winner = winner; neuron_id = createdNeuronId }));
                     };
-                    case (#err error) {
-                        return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = "Failed to spawn. " # debug_show error }));
-                    };
+                    case (#err error) { return };
                 };
 
             };
-            case (#err error) {
-                return ignore Operations.logOperation(_operationHistory, #Error({ function = "spawnRandomReward()"; message = error }));
-            };
+            case (#err error) { return };
         };
     };
 

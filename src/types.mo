@@ -32,7 +32,6 @@ module {
         #DisburseReward : DisburseReward;
         #CreateNeuron : CreateNeuron;
         #RewardTimer : RewardTimer;
-        #Error : Error;
     };
 
     public type StakeTransfer = {
@@ -63,11 +62,6 @@ module {
     public type RewardTimer = {
         timer_id : Nat;
         timer_duration_nanos : Nat64;
-    };
-
-    public type Error = {
-        function : Text;
-        message : Text;
     };
 
     public type CreateNeuron = {

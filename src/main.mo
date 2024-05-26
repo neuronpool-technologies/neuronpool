@@ -11,8 +11,8 @@ import AccountIdentifier "mo:account-identifier";
 import IcpLedgerInterface "mo:neuro/interfaces/icp_ledger_interface";
 import IcpGovernanceInterface "mo:neuro/interfaces/nns_interface";
 import NeuroTypes "mo:neuro/types";
+import Mock "../testing/mock";
 import { NNS } "mo:neuro";
-import Prim "mo:⛔";
 
 shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
@@ -147,29 +147,23 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     //
     /* for testing */
     //
-    type HeapData = {
-        operation_entries : Nat;
-        heap_bytes : Nat;
-        heap_mb : Nat;
+
+    public shared query ({ caller }) func controller_get_canister_heap_data() : async Mock.HeapData {
+        assert (caller == owner);
+        Mock.getCanisterHeapData(_operationHistory);
     };
 
-    public func get_canister_heap_data() : async HeapData {
-        let heap = Prim.rts_heap_size();
-        let kb = heap / 1024;
-        let mb = kb / 1024;
-
-        return {
-            operation_entries = Vector.size(_operationHistory);
-            heap_bytes = heap;
-            heap_mb = mb;
-        };
+    public shared ({ caller }) func controller_add_mock_data() : async () {
+        assert (caller == owner);
+        return Mock.addMockData(_operationHistory);
     };
 
-    // TODO
-    public func add_mock_data() : async Any {
-        // mock a log operation
-        
+    // probably the most intense function:
+    public shared query ({ caller }) func controller_get_current_stakers() : async [(Principal, Nat64)] {
+        assert (caller == owner);
+        return Operations.getCurrentStakers(_operationHistory);
     };
+
     //
     /* for testing */
     //
@@ -445,6 +439,17 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     /// Canister Private Functions ///
     //////////////////////////////////
 
+    private func getCanisterAccounts() : async T.CanisterAccountsResult {
+        return #ok({
+            account_identifier = Principal.fromActor(thisCanister) |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_) |> Hex.encode(_);
+            icrc1_identifier = Principal.fromActor(thisCanister) |> Principal.toText(_);
+            balance = await IcpLedger.icrc1_balance_of({
+                owner = Principal.fromActor(thisCanister);
+                subaccount = null;
+            });
+        });
+    };
+
     private func getNeuronInformation(neuronId : T.NeuronId) : async NeuroTypes.NnsInformationResult {
         let neuron = NNS.Neuron({
             nns_canister_id = Principal.fromActor(IcpGovernance);
@@ -500,21 +505,6 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         );
 
         return #ok(Operations.logOperation(_operationHistory, #RewardTimer({ timer_id = newTimerId; timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS })));
-    };
-
-    //////////////////////////////////////////////
-    /// Protocol Information Private Functions ///
-    //////////////////////////////////////////////
-
-    private func getCanisterAccounts() : async T.CanisterAccountsResult {
-        return #ok({
-            account_identifier = Principal.fromActor(thisCanister) |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_) |> Hex.encode(_);
-            icrc1_identifier = Principal.fromActor(thisCanister) |> Principal.toText(_);
-            balance = await IcpLedger.icrc1_balance_of({
-                owner = Principal.fromActor(thisCanister);
-                subaccount = null;
-            });
-        });
     };
 
 };

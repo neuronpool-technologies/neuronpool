@@ -19,7 +19,8 @@ target/
 # identity
 .identity
 
-# environment variables
+# configs
 canister_ids.json
 .env
 .mops
+mock.sh

@@ -44,12 +44,18 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     // The canister controlled neuron will follow this neuron on all votes
     let DEFAULT_NEURON_FOLLOWEE : T.NeuronId = 6914974521667616512; // Rakeoff.io named neuron
 
-    // The dissolve delay for the main. Also inherited by all split neurons
+    // The dissolve delay for the main neuron. Also inherited by all split neurons
     let NEURON_DISSOLVE_DELAY_SECONDS : Nat32 = 15897600; // 184 days
 
-    // If this limit is reached we don't allow any more stakeTransfers
-    // All other operations are allowed to continue
-    let OPERATION_HISTORY_LIMIT : Nat = 100_000;
+    // Once this limit is reached, no further stake transfers will be allowed,
+    // though all other operations can continue without interruption.
+    // Testing has shown that the system can handle over 1,000,000 entries without issues.
+    // Each 100,000 entries consumes approximately 10MB of heap memory.
+    // The heap can theoretically reach up to 1-2 GB without problems, with protocol-level plans to increase this.
+    // We chose the 500,000 limit to monitor the system's performance and adjust as necessary.
+    // Given typical usage patterns, it may take years to reach 500,000 entries.
+    // Scaling solutions include increasing this threshold or adding more canisters.
+    let OPERATION_HISTORY_LIMIT : Nat = 500_000;
 
     // The fee percentage paid to the smart contract
     let PROTOCOL_FEE_PERCENTAGE : Nat64 = 10; // 10%
@@ -140,33 +146,14 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return setSpawnRewardTimer<system>();
     };
 
+    public shared query ({ caller }) func controller_get_canister_memory() : async Mock.HeapData {
+        assert (caller == owner);
+        return Mock.getCanisterHeapData(_operationHistory)
+    };
+
     ////////////////////////////////////
     /// Information Public Functions ///
     ////////////////////////////////////
-
-    //
-    /* for testing */
-    //
-
-    public shared query ({ caller }) func controller_get_canister_heap_data() : async Mock.HeapData {
-        assert (caller == owner);
-        Mock.getCanisterHeapData(_operationHistory);
-    };
-
-    public shared ({ caller }) func controller_add_mock_data() : async () {
-        assert (caller == owner);
-        return Mock.addMockData(_operationHistory);
-    };
-
-    // probably the most intense function:
-    public shared query ({ caller }) func controller_get_current_stakers() : async [(Principal, Nat64)] {
-        assert (caller == owner);
-        return Operations.getCurrentStakers(_operationHistory);
-    };
-
-    //
-    /* for testing */
-    //
 
     public func get_canister_accounts() : async T.CanisterAccountsResult {
         return await getCanisterAccounts();

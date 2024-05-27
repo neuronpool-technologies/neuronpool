@@ -15,6 +15,8 @@ module {
         operation_entries : Nat;
         heap_bytes : Nat;
         heap_mb : Nat;
+        mem_bytes : Nat;
+        mem_mb : Nat;
     };
 
     public func addMockData(history : T.OperationHistory) : () {
@@ -85,13 +87,18 @@ module {
 
     public func getCanisterHeapData(history : T.OperationHistory) : HeapData {
         let heap = Prim.rts_heap_size();
-        let kb = heap / 1024;
-        let mb = kb / 1024;
+        let heap_kb = heap / 1024;
+        let heap_mb = heap_kb / 1024;
 
+        let mem = Prim.rts_memory_size();
+        let mem_kb = mem / 1024;
+        let mem_mb = mem_kb / 1024;
         return {
             operation_entries = Vector.size(history);
             heap_bytes = heap;
-            heap_mb = mb;
+            heap_mb = heap_mb;
+            mem_bytes = mem;
+            mem_mb = mem_mb;
         };
     };
 };

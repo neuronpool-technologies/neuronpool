@@ -7,4 +7,3 @@ neuro = "0.1.4"
 
 [dev-dependencies]
 test = "2.0.0"
-bench = "1.0.0"

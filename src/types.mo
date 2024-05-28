@@ -6,12 +6,12 @@ module {
 
     public type Result<X, Y> = Result.Result<X, Y>;
 
-    public type CanisterAccountsResult = Result<CanisterAccounts, ()>;
+    public type ProtocolInformationResult = Result<ProtocolInformation, ()>;
 
     public type OperationResponse = Result<OperationIndex, Text>;
 
     public type ConfigureResponse = NeuroTypes.ConfigureResult;
-    
+
     public type HistoryResult = Result<History, ()>;
 
     public type NeuronId = NeuroTypes.NnsNeuronId;
@@ -69,15 +69,27 @@ module {
         token : Text;
     };
 
-    public type CanisterAccounts = {
-        account_identifier : Text;
-        icrc1_identifier : Text;
-        balance : Nat;
-    };
-
     public type History = {
         total : Nat;
         operations : [?Operation];
     };
 
+    public type ProtocolInformation = {
+        account_identifier : Text;
+        icrc_identifier : Text;
+        canister_balance : Nat;
+        minimum_stake : Nat64;
+        minimum_withdrawal : Nat64;
+        protocol_fee_percentage : Nat64;
+        reward_timer_duration_nanos : Nat64;
+        default_neuron_followee : NeuronId;
+        main_neuron_dissolve_seconds : Nat32;
+        total_protocol_fees : Nat64;
+        total_stake_amount : Nat64;
+    };
+
+    public type StakerPrizeNeurons = {
+        claimed : [DisburseReward];
+        all_prize_neurons : [NeuronId];
+    };
 };

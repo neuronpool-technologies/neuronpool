@@ -113,9 +113,12 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return Operations.getStakerWithdrawalNeurons(_operationHistory, caller);
     };
 
-    public shared query ({ caller }) func get_staker_prize_neurons() : async [T.NeuronId] {
+    public shared query ({ caller }) func get_staker_prize_neurons() : async T.StakerPrizeNeurons {
         assert (Principal.isAnonymous(caller) == false);
-        return Operations.getStakerPrizeNeurons(_operationHistory, caller);
+        return {
+            claimed = Operations.getStakerClaimedPrizeNeurons(_operationHistory, caller);
+            all_prize_neurons = Operations.getStakerPrizeNeurons(_operationHistory, caller);
+        };
     };
 
     ///////////////////////////////////
@@ -148,28 +151,19 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
     public shared query ({ caller }) func controller_get_canister_memory() : async Mock.HeapData {
         assert (caller == owner);
-        return Mock.getCanisterHeapData(_operationHistory)
+        return Mock.getCanisterHeapData(_operationHistory);
     };
 
     ////////////////////////////////////
     /// Information Public Functions ///
     ////////////////////////////////////
 
-    public func get_canister_accounts() : async T.CanisterAccountsResult {
-        return await getCanisterAccounts();
+    public func get_protocol_information() : async T.ProtocolInformationResult {
+        return await getProtocolInformation();
     };
 
-    // can be used to calculate any stats on the frontend:
     public query func get_operation_history({ start : Nat; length : Nat }) : async T.HistoryResult {
         return Operations.getOperationHistory(_operationHistory, start, length);
-    };
-
-    public query func get_minimum_stake() : async Nat64 {
-        return MINIMUM_STAKE + ICP_PROTOCOL_FEE;
-    };
-
-    public query func get_minimum_withdrawal() : async Nat64 {
-        return ONE_ICP + ICP_PROTOCOL_FEE;
     };
 
     public func get_neuron_information(neuronId : T.NeuronId) : async NeuroTypes.NnsInformationResult {
@@ -426,14 +420,22 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     /// Canister Private Functions ///
     //////////////////////////////////
 
-    private func getCanisterAccounts() : async T.CanisterAccountsResult {
+    private func getProtocolInformation() : async T.ProtocolInformationResult {
         return #ok({
             account_identifier = Principal.fromActor(thisCanister) |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_) |> Hex.encode(_);
-            icrc1_identifier = Principal.fromActor(thisCanister) |> Principal.toText(_);
-            balance = await IcpLedger.icrc1_balance_of({
+            icrc_identifier = Principal.fromActor(thisCanister) |> Principal.toText(_);
+            canister_balance = await IcpLedger.icrc1_balance_of({
                 owner = Principal.fromActor(thisCanister);
                 subaccount = null;
             });
+            minimum_stake = MINIMUM_STAKE + ICP_PROTOCOL_FEE;
+            minimum_withdrawal = ONE_ICP + ICP_PROTOCOL_FEE;
+            protocol_fee_percentage = PROTOCOL_FEE_PERCENTAGE;
+            reward_timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS;
+            default_neuron_followee = DEFAULT_NEURON_FOLLOWEE;
+            main_neuron_dissolve_seconds = NEURON_DISSOLVE_DELAY_SECONDS;
+            total_protocol_fees = Operations.getTotalProtocolFees(_operationHistory);
+            total_stake_amount = Operations.getTotalStakeAmount(_operationHistory);
         });
     };
 

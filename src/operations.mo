@@ -81,8 +81,25 @@ module {
         for (op in Vector.vals(history)) {
             switch (op.action) {
                 case (#SpawnReward(args)) {
-                    if (Principal.equal(caller, args.winner) and VectorClass.contains(filtered, args.neuron_id, Nat64.equal) == false) {
+                    if (Principal.equal(caller, args.winner)) {
                         filtered.add(args.neuron_id);
+                    };
+                };
+                case _ { /* do nothing */ };
+            };
+        };
+
+        return VectorClass.toArray(filtered);
+    };
+
+    public func getStakerClaimedPrizeNeurons(history : T.OperationHistory, caller : Principal) : [T.DisburseReward] {
+        let filtered = VectorClass.Vector<T.DisburseReward>();
+
+        for (op in Vector.vals(history)) {
+            switch (op.action) {
+                case (#DisburseReward(args)) {
+                    if (Principal.equal(caller, args.winner)) {
+                        filtered.add(args);
                     };
                 };
                 case _ { /* do nothing */ };
@@ -203,5 +220,19 @@ module {
         };
 
         return Map.filter(stakers, Map.phash, func(_k : Principal, v : Nat64) : Bool { return v > 0 }) |> Map.toArray(_);
+    };
+
+    public func getTotalProtocolFees(history : T.OperationHistory) : Nat64 {
+        var sum : Nat64 = 0;
+        for (op in Vector.vals(history)) {
+            switch (op.action) {
+                case (#DisburseReward(args)) {
+                    sum += args.protocol_fee;
+                };
+                case _ { /* do nothing */ };
+            };
+        };
+
+        return sum;
     };
 };

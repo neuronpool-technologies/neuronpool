@@ -77,7 +77,6 @@ module {
     public type ProtocolInformation = {
         account_identifier : Text;
         icrc_identifier : Text;
-        canister_balance : Nat;
         minimum_stake : Nat64;
         minimum_withdrawal : Nat64;
         protocol_fee_percentage : Nat64;

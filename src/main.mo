@@ -158,8 +158,8 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     /// Information Public Functions ///
     ////////////////////////////////////
 
-    public func get_protocol_information() : async T.ProtocolInformationResult {
-        return await getProtocolInformation();
+    public query func get_protocol_information() : async T.ProtocolInformationResult {
+        return getProtocolInformation();
     };
 
     public query func get_operation_history({ start : Nat; length : Nat }) : async T.HistoryResult {
@@ -420,14 +420,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     /// Canister Private Functions ///
     //////////////////////////////////
 
-    private func getProtocolInformation() : async T.ProtocolInformationResult {
+    private func getProtocolInformation() : T.ProtocolInformationResult {
         return #ok({
             account_identifier = Principal.fromActor(thisCanister) |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_) |> Hex.encode(_);
             icrc_identifier = Principal.fromActor(thisCanister) |> Principal.toText(_);
-            canister_balance = await IcpLedger.icrc1_balance_of({
-                owner = Principal.fromActor(thisCanister);
-                subaccount = null;
-            });
             minimum_stake = MINIMUM_STAKE + ICP_PROTOCOL_FEE;
             minimum_withdrawal = ONE_ICP + ICP_PROTOCOL_FEE;
             protocol_fee_percentage = PROTOCOL_FEE_PERCENTAGE;

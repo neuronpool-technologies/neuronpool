@@ -85,6 +85,7 @@ module {
         main_neuron_dissolve_seconds : Nat32;
         total_protocol_fees : Nat64;
         total_stake_amount : Nat64;
+        total_stakers : Nat;
     };
 
     public type StakerPrizeNeurons = {

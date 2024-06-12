@@ -425,7 +425,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             account_identifier = Principal.fromActor(thisCanister) |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_) |> Hex.encode(_);
             icrc_identifier = Principal.fromActor(thisCanister) |> Principal.toText(_);
             minimum_stake = MINIMUM_STAKE;
-            minimum_withdrawal = ONE_ICP + ICP_PROTOCOL_FEE;
+            minimum_withdrawal = ONE_ICP;
             protocol_fee_percentage = PROTOCOL_FEE_PERCENTAGE;
             reward_timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS;
             default_neuron_followee = DEFAULT_NEURON_FOLLOWEE;

@@ -342,7 +342,7 @@ suite(
 
                 // make withdrawals
                 for ((mockUser, mockAmount) in mockPrincipalsAndAmounts.vals()) {
-                    ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({ staker = Principal.fromText(mockUser); neuron_id = mockNeuronId; amount_e8s = mockAmount; blockchain_fee = mockBlockchainFee }));
+                    ignore Operations.logOperation(_mockOperationHistory, #StakeWithdrawal({ staker = Principal.fromText(mockUser); neuron_id = mockNeuronId; amount_e8s = mockAmount - mockBlockchainFee; blockchain_fee = mockBlockchainFee }));
                 };
 
                 // there should be 0 current stakers:

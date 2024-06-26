@@ -199,7 +199,6 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
         switch (await getNeuronInformation(Operations.mainNeuronId(_operationHistory))) {
             case (#ok { account }) {
-                // TODO may need to refresh neuron
                 let transferResult = await IcpLedger.icrc2_transfer_from({
                     to = {
                         owner = Principal.fromActor(IcpGovernance); // NNS canister
@@ -215,6 +214,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
                 switch (transferResult) {
                     case (#Ok _) {
+                        ignore refreshMainNeuron();
                         return #ok(
                             Operations.logOperation(
                                 _operationHistory,
@@ -250,6 +250,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
             switch (await neuron.split({ amount_e8s = amount_e8s })) {
                 case (#ok createdNeuronId) {
+                    ignore refreshMainNeuron();
                     return #ok(
                         Operations.logOperation(
                             _operationHistory,
@@ -420,6 +421,15 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             topic = topic;
             followee = DEFAULT_NEURON_FOLLOWEE;
         });
+    };
+
+    private func refreshMainNeuron() : async () {
+        let neuron = NNS.Neuron({
+            nns_canister_id = Principal.fromActor(IcpGovernance);
+            neuron_id = Operations.mainNeuronId(_operationHistory);
+        });
+
+        ignore await neuron.refresh();
     };
 
     //////////////////////////////////

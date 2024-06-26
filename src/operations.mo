@@ -37,6 +37,19 @@ module {
         Debug.trap("Main neuron ID not found");
     };
 
+    public func assertMainNeuronStaked(history : T.OperationHistory) : Bool {
+        for (op in Vector.vals(history)) {
+            switch (op.action) {
+                case (#CreateNeuron { neuron_id }) {
+                    return true;
+                };
+                case _ {};
+            };
+        };
+
+        return false;
+    };
+
     public func stakerBalance(history : T.OperationHistory, caller : Principal) : Nat64 {
         var sum : Nat64 = 0;
         for (op in Vector.vals(history)) {

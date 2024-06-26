@@ -78,7 +78,7 @@ module {
     };
 
     public func logMockCreateNeuron(history : T.OperationHistory) : () {
-        ignore Operations.logOperation(history, #CreateNeuron({ neuron_id = mockNeuronId; token = "ICP" }));
+        ignore Operations.logOperation(history, #CreateNeuron({ neuron_id = mockNeuronId; token = "ICP"; amount_e8s = 100_000_000 }));
     };
 
     public func logMockRewardTimer(history : T.OperationHistory) : () {

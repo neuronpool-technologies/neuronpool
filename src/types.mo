@@ -67,6 +67,7 @@ module {
     public type CreateNeuron = {
         neuron_id : Nat64;
         token : Text;
+        amount_e8s : Nat64;
     };
 
     public type History = {

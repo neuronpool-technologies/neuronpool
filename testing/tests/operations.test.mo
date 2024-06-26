@@ -123,7 +123,7 @@ suite(
             "high usage and payload (>100,000 operations)",
             func() {
                 // simulate main neuron gets staked
-                ignore Operations.logOperation(_mockOperationHistory, #CreateNeuron({ neuron_id = mockNeuronId; token = "ICP" }));
+                ignore Operations.logOperation(_mockOperationHistory, #CreateNeuron({ neuron_id = mockNeuronId; token = "ICP"; amount_e8s = 100_000_000 }));
 
                 // simulate over a 100,000 entries (range * array size)
                 for (i in Iter.range(0, 9999)) {

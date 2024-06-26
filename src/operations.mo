@@ -189,7 +189,7 @@ module {
                     sum += args.amount_e8s;
                 };
                 case (#StakeWithdrawal(args)) {
-                    sum -= args.amount_e8s;
+                    sum -= args.amount_e8s + args.blockchain_fee;
                 };
                 case _ { /* do nothing */ };
             };
@@ -224,7 +224,7 @@ module {
                             // if no previous value make no changes
                             let ?previousValue = v else return null;
                             // if an existing previous value, decrement
-                            return ?(previousValue - args.amount_e8s);
+                            return ?(previousValue - (args.amount_e8s + args.blockchain_fee));
                         },
                     );
                 };

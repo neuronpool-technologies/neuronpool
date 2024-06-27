@@ -47,10 +47,6 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     // The dissolve delay for the main neuron. Also inherited by all split neurons
     let NEURON_DISSOLVE_DELAY_SECONDS : Nat32 = 15897600; // 184 days
 
-    // for testing
-    // TODO remove for launch
-    let TEST_NEURON_DISSOLVE_DELAY_SECONDS : Nat32 = 86400; // 1 day
-
     // Once this limit is reached, no further stake transfers will be allowed,
     // though all other operations can continue without interruption.
     // Testing has shown that the system can handle over 1,000,000 entries without issues.
@@ -402,7 +398,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                 });
 
                 return await neuron.increaseDissolveDelay({
-                    additional_dissolve_delay_seconds = TEST_NEURON_DISSOLVE_DELAY_SECONDS;
+                    additional_dissolve_delay_seconds = NEURON_DISSOLVE_DELAY_SECONDS;
                 });
             };
             case (#err error) {
@@ -445,7 +441,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             protocol_fee_percentage = PROTOCOL_FEE_PERCENTAGE;
             reward_timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS;
             default_neuron_followee = DEFAULT_NEURON_FOLLOWEE;
-            main_neuron_dissolve_seconds = TEST_NEURON_DISSOLVE_DELAY_SECONDS;
+            main_neuron_dissolve_seconds = NEURON_DISSOLVE_DELAY_SECONDS;
             total_protocol_fees = Operations.getTotalProtocolFees(_operationHistory);
             total_stake_amount = Operations.getTotalStakeAmount(_operationHistory);
             total_stakers = Operations.getCurrentStakers(_operationHistory).size();

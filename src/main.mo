@@ -191,6 +191,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return Operations.getOperationHistory(_operationHistory, start, length);
     };
 
+    public query func get_reward_distributions() : async [T.Operation] {
+        return Operations.getRewardDistributions(_operationHistory);
+    };
+
     public func get_neuron_information(neuronId : T.NeuronId) : async NeuroTypes.NnsInformationResult {
         return await getNeuronInformation(neuronId);
     };

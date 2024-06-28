@@ -275,4 +275,20 @@ module {
 
         return sum;
     };
+
+    public func getRewardDistributions(history : T.OperationHistory) : [T.Operation] {
+        let filtered = VectorClass.Vector<T.Operation>();
+
+        for (op in Vector.vals(history)) {
+            switch (op.action) {
+                case (#SpawnReward _) {
+                    filtered.add(op); // we want the time stamp too
+                };
+                case _ { /* do nothing */ };
+            };
+        };
+
+        return VectorClass.toArray(filtered);
+    };
+
 };

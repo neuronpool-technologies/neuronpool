@@ -27,6 +27,7 @@ module {
 
     public type Action = {
         #StakeTransfer : StakeTransfer;
+        #StakeDonation : StakeDonation;
         #StakeWithdrawal : StakeWithdrawal;
         #SpawnReward : SpawnReward;
         #DisburseReward : DisburseReward;
@@ -36,6 +37,12 @@ module {
 
     public type StakeTransfer = {
         staker : Principal;
+        amount_e8s : Nat64;
+        blockchain_fee : Nat64;
+    };
+
+    public type StakeDonation = {
+        from : ?Principal;
         amount_e8s : Nat64;
         blockchain_fee : Nat64;
     };

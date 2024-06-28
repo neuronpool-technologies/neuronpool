@@ -125,9 +125,11 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     /// Controller Public Functions ///
     ///////////////////////////////////
 
-    public shared ({ caller }) func controller_stake_main_neuron() : async T.OperationResponse {
+    public shared ({ caller }) func controller_stake_main_neuron({
+        amount_e8s : Nat64;
+    }) : async T.OperationResponse {
         assert (caller == owner);
-        return await stakeMainNeuron();
+        return await stakeMainNeuron(amount_e8s);
     };
 
     public shared ({ caller }) func controller_set_main_neuron_dissolve_delay() : async T.ConfigureResponse {
@@ -140,6 +142,31 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     }) : async T.ConfigureResponse {
         assert (caller == owner);
         return await setMainNeuronFollowing(topic);
+    };
+
+    // This function is currently not an icrc2_transfer_from, because it exposes the ICP address of the main neuron.
+    // This exposure means anyone could add ICP to the main neuron, and we would have no way of reflecting that in the TVL without this function.
+    // Stake donations exist because we may want to boost the APY of the neuron on behalf of all real users.
+    // Stake donations and the initial neuron staking amount are ignored when picking a winner to avoid affecting the runningSum.
+    public shared ({ caller }) func controller_add_stake_donation({
+        from : ?Principal;
+        amount_e8s : Nat64;
+    }) : async T.OperationResponse {
+        assert (caller == owner);
+        // Refresh the neuron to show the new balance
+        ignore refreshMainNeuron();
+
+        // Log the amount to update the TVL
+        return #ok(
+            Operations.logOperation(
+                _operationHistory,
+                #StakeDonation({
+                    from = from;
+                    amount_e8s = amount_e8s;
+                    blockchain_fee = ICP_PROTOCOL_FEE;
+                }),
+            )
+        );
     };
 
     public shared ({ caller }) func controller_set_spawn_reward_timer() : async T.OperationResponse {
@@ -363,7 +390,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     /// Controller Private Functions ///
     ////////////////////////////////////
 
-    private func stakeMainNeuron() : async T.OperationResponse {
+    private func stakeMainNeuron(amount_e8s : Nat64) : async T.OperationResponse {
         if (Operations.assertMainNeuronStaked(_operationHistory)) return #err("Main neuron has already been staked");
 
         let nns = NNS.Governance({
@@ -372,11 +399,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             icp_ledger_canister_id = Principal.fromActor(IcpLedger);
         });
 
-        // Stake one ICP to create the neuron.
-        // This amount is not included in our total stake calculations
-        // because including it would necessitate adjustments in our weighted selection algorithm.
-        // It is simpler to exclude the initial one ICP stake from the total calculation.
-        switch (await nns.stake({ amount_e8s = ONE_ICP })) {
+        switch (await nns.stake({ amount_e8s = amount_e8s })) {
             case (#ok neuronId) {
                 // store the staked neuron in the log
                 return #ok(Operations.logOperation(_operationHistory, #CreateNeuron({ neuron_id = neuronId; token = "ICP"; amount_e8s = ONE_ICP })));
@@ -443,7 +466,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             default_neuron_followee = DEFAULT_NEURON_FOLLOWEE;
             main_neuron_dissolve_seconds = NEURON_DISSOLVE_DELAY_SECONDS;
             total_protocol_fees = Operations.getTotalProtocolFees(_operationHistory);
-            total_stake_amount = Operations.getTotalStakeAmount(_operationHistory);
+            total_stake_amount = Operations.getTotalNeuronStake(_operationHistory);
             total_stakers = Operations.getCurrentStakers(_operationHistory).size();
         });
     };
@@ -463,7 +486,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                 if (maturity_e8s_equivalent < MINIMUM_SPAWN) return;
 
                 // Calculate total stake amount for generating random threshold
-                let totalAmount = Operations.getTotalStakeAmount(_operationHistory);
+                let totalAmount = Operations.getTotalStakeDeposits(_operationHistory);
 
                 let ?randomNumber = await Prize.generateRandomThreshold(totalAmount) else return;
 

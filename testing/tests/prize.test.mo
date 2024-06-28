@@ -37,7 +37,7 @@ await suite(
                     ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({ staker = Principal.fromText(mockUser); amount_e8s = mockAmount; blockchain_fee = mockBlockchainFee }));
                 };
 
-                let totalStakeAmount = Operations.getTotalStakeAmount(_mockOperationHistory);
+                let totalStakeAmount = Operations.getTotalStakeDeposits(_mockOperationHistory);
                 Debug.print("Total stake amount e8s: " # debug_show totalStakeAmount);
 
                 let randomThreshold = await Prize.generateRandomThreshold(totalStakeAmount);
@@ -57,7 +57,7 @@ await suite(
                     ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({ staker = Principal.fromText(mockUser); amount_e8s = mockAmount; blockchain_fee = mockBlockchainFee }));
                 };
 
-                let totalStakeAmount = Operations.getTotalStakeAmount(_mockOperationHistory);
+                let totalStakeAmount = Operations.getTotalStakeDeposits(_mockOperationHistory);
                 Debug.print("Total stake amount e8s: " # debug_show totalStakeAmount);
 
                 let ?randomThreshold = await Prize.generateRandomThreshold(totalStakeAmount) else return;
@@ -78,7 +78,7 @@ await suite(
                     };
                 };
 
-                let totalStakeAmount = Operations.getTotalStakeAmount(_mockOperationHistory);
+                let totalStakeAmount = Operations.getTotalStakeDeposits(_mockOperationHistory);
                 Debug.print("Total stake amount e8s: " # debug_show totalStakeAmount);
 
                 let ?randomThreshold = await Prize.generateRandomThreshold(totalStakeAmount) else return;
@@ -100,7 +100,7 @@ await suite(
                     };
                 };
 
-                let totalStakeAmount = Operations.getTotalStakeAmount(_mockOperationHistory);
+                let totalStakeAmount = Operations.getTotalStakeDeposits(_mockOperationHistory);
                 Debug.print("Total stake amount e8s: " # debug_show totalStakeAmount);
 
                 let ?randomThreshold = await Prize.generateRandomThreshold(totalStakeAmount) else return;
@@ -125,7 +125,7 @@ await suite(
                     ignore Operations.logOperation(_mockOperationHistory, #StakeTransfer({ staker = Principal.fromText(mockUser); amount_e8s = mockAmount; blockchain_fee = mockBlockchainFee }));
                 };
 
-                let totalStakeAmount = Operations.getTotalStakeAmount(_mockOperationHistory);
+                let totalStakeAmount = Operations.getTotalStakeDeposits(_mockOperationHistory);
                 Debug.print("Total stake amount e8s: " # debug_show totalStakeAmount);
 
                 let ?randomThreshold = await Prize.generateRandomThreshold(totalStakeAmount) else return;
@@ -162,7 +162,7 @@ await suite(
                     };
                 };
 
-                let totalStakeAmount = Operations.getTotalStakeAmount(_mockOperationHistory);
+                let totalStakeAmount = Operations.getTotalStakeDeposits(_mockOperationHistory);
                 Debug.print("Total stake amount e8s: " # debug_show totalStakeAmount);
 
                 let ?randomThreshold = await Prize.generateRandomThreshold(totalStakeAmount) else return;

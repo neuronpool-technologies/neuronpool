@@ -181,7 +181,9 @@ module {
         return null;
     };
 
-    public func getTotalStakeAmount(history : T.OperationHistory) : Nat64 {
+    // This function calculates the total stake amount of users who transferred in to the neuron.
+    // It is used to determine the total deposits, which is necessary for selecting a winner for the reward.
+    public func getTotalStakeDeposits(history : T.OperationHistory) : Nat64 {
         var sum : Nat64 = 0;
         for (op in Vector.vals(history)) {
             switch (op.action) {
@@ -190,6 +192,31 @@ module {
                 };
                 case (#StakeWithdrawal(args)) {
                     sum -= args.amount_e8s + args.blockchain_fee;
+                };
+                case _ { /* do nothing */ };
+            };
+        };
+
+        return sum;
+    };
+
+    // This function calculates the real total stake amount of all the ICP in the neuron.
+    // It takes into account the amount used to stake the initial neuron and any other donation amounts added.
+    public func getTotalNeuronStake(history : T.OperationHistory) : Nat64 {
+        var sum : Nat64 = 0;
+        for (op in Vector.vals(history)) {
+            switch (op.action) {
+                case (#StakeTransfer(args)) {
+                    sum += args.amount_e8s;
+                };
+                case (#StakeWithdrawal(args)) {
+                    sum -= args.amount_e8s + args.blockchain_fee;
+                };
+                case (#CreateNeuron(args)) {
+                    sum += args.amount_e8s;
+                };
+                case (#StakeDonation(args)) {
+                    sum += args.amount_e8s;
                 };
                 case _ { /* do nothing */ };
             };

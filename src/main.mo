@@ -39,7 +39,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     let MINIMUM_SPAWN : Nat64 = 106_000_000;
 
     // The refresh rate of checking if rewards are ready to spawn
-    let SPAWN_REWARD_TIMER_DURATION_NANOS : Nat64 = (30 * 24 * 60 * 60 * 1_000_000_000); // 30 days
+    let SPAWN_REWARD_TIMER_DURATION_NANOS : Nat64 = (7 * 24 * 60 * 60 * 1_000_000_000); // 7 days
 
     // The canister controlled neuron will follow this neuron on all votes
     let DEFAULT_NEURON_FOLLOWEE : T.NeuronId = 6914974521667616512; // Rakeoff.io named neuron

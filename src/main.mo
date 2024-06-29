@@ -7,6 +7,7 @@ import Operations "./operations";
 import T "./types";
 import Hex "mo:encoding/Hex";
 import Vector "mo:vector";
+import Map "mo:map/Map";
 import AccountIdentifier "mo:account-identifier";
 import IcpLedgerInterface "mo:neuro/interfaces/icp_ledger_interface";
 import IcpGovernanceInterface "mo:neuro/interfaces/nns_interface";
@@ -65,6 +66,8 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     //////////////////////
 
     stable let _operationHistory : T.OperationHistory = Vector.new<T.Operation>();
+
+    stable let _ongoingStakeWithdrawals = Map.new<Principal, Nat64>();
 
     /////////////////////////////
     /// User Public Functions ///
@@ -267,6 +270,13 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     private func initiateIcpStakeWithdrawal(caller : Principal, amount_e8s : Nat64) : async T.OperationResponse {
         if (amount_e8s < ONE_ICP + ICP_PROTOCOL_FEE) return #err("Insufficient amount to withdraw: " # debug_show amount_e8s # ". A minimum of 1.0001 ICP is needed.");
 
+        if (Map.has(_ongoingStakeWithdrawals, Map.phash, caller)) {
+            return #err("Stake withdrawal is already in progress for caller: " # debug_show caller);
+        };
+
+        // add the transaction to ongoing withdrawals
+        Map.set(_ongoingStakeWithdrawals, Map.phash, caller, amount_e8s);
+
         let balance = Operations.stakerBalance(_operationHistory, caller);
 
         if (balance >= amount_e8s) {
@@ -278,6 +288,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             switch (await neuron.split({ amount_e8s = amount_e8s })) {
                 case (#ok createdNeuronId) {
                     ignore refreshMainNeuron();
+
+                    // cleanup ongoing withdrawals
+                    Map.delete(_ongoingStakeWithdrawals, Map.phash, caller);
+
                     return #ok(
                         Operations.logOperation(
                             _operationHistory,
@@ -291,10 +305,14 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                     );
                 };
                 case (#err error) {
+                    // cleanup ongoing withdrawals
+                    Map.delete(_ongoingStakeWithdrawals, Map.phash, caller);
                     return #err("Failed to split new neuron. " # debug_show error);
                 };
             };
         } else {
+            // cleanup ongoing withdrawals
+            Map.delete(_ongoingStakeWithdrawals, Map.phash, caller);
             return #err("Insufficient balance for caller: " # debug_show caller # ". Balance: " # debug_show balance);
         };
     };

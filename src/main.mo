@@ -179,7 +179,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
     public shared query ({ caller }) func controller_get_canister_memory() : async Mock.HeapData {
         assert (caller == owner);
-        return Mock.getCanisterHeapData(_operationHistory);
+        return Mock.getCanisterHeapData(_operationHistory, _ongoingStakeWithdrawals);
     };
 
     ////////////////////////////////////

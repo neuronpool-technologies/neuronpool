@@ -1,6 +1,7 @@
 import T "../src/types";
 import Prim "mo:⛔";
 import Vector "mo:vector";
+import Map "mo:map/Map";
 import Iter "mo:base/Iter";
 import Principal "mo:base/Principal";
 import Operations "../src/operations";
@@ -13,6 +14,7 @@ module {
 
     public type HeapData = {
         operation_entries : Nat;
+        ongoing_withdrawals : [(Principal, Nat64)];
         heap_bytes : Nat;
         heap_mb : Nat;
         mem_bytes : Nat;
@@ -85,7 +87,7 @@ module {
         ignore Operations.logOperation(history, #RewardTimer({ timer_id = mockTimerId; timer_duration_nanos = mockTimerDuration }));
     };
 
-    public func getCanisterHeapData(history : T.OperationHistory) : HeapData {
+    public func getCanisterHeapData(history : T.OperationHistory, ongoingWithdrawals : Map.Map<Principal, Nat64>) : HeapData {
         let heap = Prim.rts_heap_size();
         let heap_kb = heap / 1024;
         let heap_mb = heap_kb / 1024;
@@ -95,6 +97,7 @@ module {
         let mem_mb = mem_kb / 1024;
         return {
             operation_entries = Vector.size(history);
+            ongoing_withdrawals = Map.toArray(ongoingWithdrawals);
             heap_bytes = heap;
             heap_mb = heap_mb;
             mem_bytes = mem;

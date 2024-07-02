@@ -57,6 +57,7 @@ module {
     public type SpawnReward = {
         winner : Principal;
         neuron_id : NeuronId;
+        maturity_e8s : Nat64;
     };
 
     public type DisburseReward = {

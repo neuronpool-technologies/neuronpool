@@ -523,7 +523,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                 switch (await neuron.spawn({ new_controller = null; percentage_to_spawn = null })) {
                     case (#ok createdNeuronId) {
                         // store the staked neuron in the log
-                        return ignore Operations.logOperation(_operationHistory, #SpawnReward({ winner = winner; neuron_id = createdNeuronId }));
+                        return ignore Operations.logOperation(_operationHistory, #SpawnReward({ winner = winner; neuron_id = createdNeuronId; maturity_e8s = maturity_e8s_equivalent }));
                     };
                     case (#err error) { return };
                 };

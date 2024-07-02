@@ -63,7 +63,7 @@ module {
     };
 
     public func logMockSpawn(history : T.OperationHistory) : () {
-        ignore Operations.logOperation(history, #SpawnReward({ winner = Principal.fromText(mockPrincipal); neuron_id = mockNeuronId }));
+        ignore Operations.logOperation(history, #SpawnReward({ winner = Principal.fromText(mockPrincipal); neuron_id = mockNeuronId; maturity_e8s = 100_000_000 }));
     };
 
     public func logMockDisburse(history : T.OperationHistory) : () {

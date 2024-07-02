@@ -134,7 +134,7 @@ suite(
                         };
 
                         // simulate a reward being spawned
-                        ignore Operations.logOperation(_mockOperationHistory, #SpawnReward({ winner = mockPrincipal; neuron_id = mockNeuronId }));
+                        ignore Operations.logOperation(_mockOperationHistory, #SpawnReward({ winner = mockPrincipal; neuron_id = mockNeuronId; maturity_e8s = 100_000_000 }));
                     } else {
                         // simulate 10 users withdrawing
                         for ((mockPrincipal, mockAmount) in mockPrincipalsAndAmounts.vals()) {
@@ -281,7 +281,7 @@ suite(
         let mockNeuronId : Nat64 = 4829694856491667492;
         let mockProtocolFee : Nat64 = 10_000;
 
-        ignore Operations.logOperation(_mockOperationHistory, #SpawnReward({ neuron_id = mockNeuronId; winner = mockPrincipal }));
+        ignore Operations.logOperation(_mockOperationHistory, #SpawnReward({ neuron_id = mockNeuronId; winner = mockPrincipal; maturity_e8s = 100_000_000 }));
 
         test(
             "correct prize neurons",

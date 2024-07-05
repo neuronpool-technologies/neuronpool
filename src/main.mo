@@ -147,10 +147,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return await setMainNeuronFollowing(topic);
     };
 
-    // This function is currently not an icrc2_transfer_from, because it exposes the ICP address of the main neuron.
-    // This exposure means anyone could add ICP to the main neuron, and we would have no way of reflecting that in the TVL without this function.
+    // This function is currently not an ICRC2 transfer_from function.
+    // The exposure of the ICP address of the main neuron allows anyone to add ICP to the main neuron, but we would have no way to reflect that in the TVL without this function.
     // Stake donations exist because we may want to boost the APY of the neuron on behalf of all real users.
-    // Stake donations and the initial neuron staking amount are ignored when picking a winner to avoid affecting the runningSum.
+    // Stake donations and the initial neuron staking amount are ignored when picking a winner to avoid affecting the running sum.
     public shared ({ caller }) func controller_add_stake_donation({
         from : ?Principal;
         amount_e8s : Nat64;
@@ -278,7 +278,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         Map.set(_ongoingStakeWithdrawals, Map.phash, caller, amount_e8s);
 
         let balance = Operations.stakerBalance(_operationHistory, caller);
-
+    
         if (balance >= amount_e8s) {
             let neuron = NNS.Neuron({
                 nns_canister_id = Principal.fromActor(IcpGovernance);

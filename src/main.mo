@@ -477,6 +477,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             protocol_fee_percentage = PROTOCOL_FEE_PERCENTAGE;
             reward_timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS;
             default_neuron_followee = DEFAULT_NEURON_FOLLOWEE;
+            main_neuron_id = Operations.mainNeuronId(_operationHistory);
             main_neuron_dissolve_seconds = NEURON_DISSOLVE_DELAY_SECONDS;
             total_protocol_fees = Operations.getTotalProtocolFees(_operationHistory);
             total_stake_amount = Operations.getTotalNeuronStake(_operationHistory);

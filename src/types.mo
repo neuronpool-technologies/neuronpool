@@ -91,6 +91,7 @@ module {
         protocol_fee_percentage : Nat64;
         reward_timer_duration_nanos : Nat64;
         default_neuron_followee : NeuronId;
+        main_neuron_id : NeuronId;
         main_neuron_dissolve_seconds : Nat32;
         total_protocol_fees : Nat64;
         total_stake_amount : Nat64;

@@ -193,8 +193,11 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return await getNeuronInformation(Operations.mainNeuronId(_operationHistory));
     };
 
-    public func list_neuron_information({ neuronIds : [T.NeuronId] }) : async NeuroTypes.NnsListNeuronsResponse {
-        return await listNeuronInformation(neuronIds);
+    public func list_neuron_information({
+        neuronIds : [T.NeuronId];
+        readable : Bool;
+    }) : async NeuroTypes.NnsListNeuronsResponse {
+        return await listNeuronInformation(neuronIds, readable);
     };
 
     //////////////////////////////
@@ -494,14 +497,17 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return await neuron.getInformation();
     };
 
-    private func listNeuronInformation(neuronIds : [T.NeuronId]) : async NeuroTypes.NnsListNeuronsResponse {
+    private func listNeuronInformation(neuronIds : [T.NeuronId], readable : Bool) : async NeuroTypes.NnsListNeuronsResponse {
         let nns = NNS.Governance({
             canister_id = Principal.fromActor(thisCanister);
             nns_canister_id = Principal.fromActor(IcpGovernance);
             icp_ledger_canister_id = Principal.fromActor(IcpLedger);
         });
 
-        return await nns.listNeurons({ neuronIds = neuronIds });
+        return await nns.listNeurons({
+            neuronIds = neuronIds;
+            readable = readable;
+        });
     };
 
     private func addStakeDonation(from : ?Principal, amount_e8s : Nat64) : async T.OperationResponse {

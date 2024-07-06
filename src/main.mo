@@ -156,20 +156,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         amount_e8s : Nat64;
     }) : async T.OperationResponse {
         assert (caller == owner);
-        // Refresh the neuron to show the new balance
-        ignore refreshMainNeuron();
-
-        // Log the amount to update the TVL
-        return #ok(
-            Operations.logOperation(
-                _operationHistory,
-                #StakeDonation({
-                    from = from;
-                    amount_e8s = amount_e8s;
-                    blockchain_fee = ICP_PROTOCOL_FEE;
-                }),
-            )
-        );
+        return await addStakeDonation(from, amount_e8s);
     };
 
     public shared ({ caller }) func controller_set_spawn_reward_timer() : async T.OperationResponse {
@@ -204,6 +191,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
     public func get_main_neuron() : async NeuroTypes.NnsInformationResult {
         return await getNeuronInformation(Operations.mainNeuronId(_operationHistory));
+    };
+
+    public func list_neuron_information({ neuronIds : [T.NeuronId] }) : async NeuroTypes.NnsListNeuronsResponse {
+        return await listNeuronInformation(neuronIds);
     };
 
     //////////////////////////////
@@ -278,7 +269,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         Map.set(_ongoingStakeWithdrawals, Map.phash, caller, amount_e8s);
 
         let balance = Operations.stakerBalance(_operationHistory, caller);
-    
+
         if (balance >= amount_e8s) {
             let neuron = NNS.Neuron({
                 nns_canister_id = Principal.fromActor(IcpGovernance);
@@ -500,6 +491,33 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         });
 
         return await neuron.getInformation();
+    };
+
+    private func listNeuronInformation(neuronIds : [T.NeuronId]) : async NeuroTypes.NnsListNeuronsResponse {
+        let nns = NNS.Governance({
+            canister_id = Principal.fromActor(thisCanister);
+            nns_canister_id = Principal.fromActor(IcpGovernance);
+            icp_ledger_canister_id = Principal.fromActor(IcpLedger);
+        });
+
+        return await nns.listNeurons({ neuronIds = neuronIds });
+    };
+
+    private func addStakeDonation(from : ?Principal, amount_e8s : Nat64) : async T.OperationResponse {
+        // Refresh the neuron to show the new balance
+        ignore refreshMainNeuron();
+
+        // Log the amount to update the TVL
+        return #ok(
+            Operations.logOperation(
+                _operationHistory,
+                #StakeDonation({
+                    from = from;
+                    amount_e8s = amount_e8s;
+                    blockchain_fee = ICP_PROTOCOL_FEE;
+                }),
+            )
+        );
     };
 
     private func spawnPrizeReward() : async () {

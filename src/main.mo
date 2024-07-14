@@ -484,6 +484,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             main_neuron_dissolve_seconds = NEURON_DISSOLVE_DELAY_SECONDS;
             total_protocol_fees = Operations.getTotalProtocolFees(_operationHistory);
             total_stake_amount = Operations.getTotalNeuronStake(_operationHistory);
+            total_stake_deposits = Operations.getTotalStakeDeposits(_operationHistory);
             total_stakers = Operations.getCurrentStakers(_operationHistory).size();
         });
     };

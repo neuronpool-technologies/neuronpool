@@ -291,4 +291,36 @@ module {
         return VectorClass.toArray(filtered);
     };
 
+    public func getStakerHistory(history : T.OperationHistory, staker : Principal) : [T.Operation] {
+        let filtered = VectorClass.Vector<T.Operation>();
+
+        for (op in Vector.vals(history)) {
+            switch (op.action) {
+                case (#StakeTransfer(args)) {
+                    if (Principal.equal(staker, args.staker)) {
+                        filtered.add(op); // we want the time stamp too
+                    };
+                };
+                case (#StakeWithdrawal(args)) {
+                    if (Principal.equal(staker, args.staker)) {
+                        filtered.add(op);
+                    };
+                };
+                case (#SpawnReward(args)) {
+                    if (Principal.equal(staker, args.winner)) {
+                        filtered.add(op);
+                    };
+                };
+                case (#DisburseReward(args)) {
+                    if (Principal.equal(staker, args.winner)) {
+                        filtered.add(op);
+                    };
+                };
+                case _ { /* do nothing */ };
+            };
+        };
+
+        return VectorClass.toArray(filtered);
+    };
+
 };

@@ -5,7 +5,7 @@
       "type": "motoko",
       "pullable": {
         "dependencies": [],
-        "wasm_url": "https://github.com/neuronpool-tech/neuronpool/raw/main/.dfx/ic/canisters/neuronpool/neuronpool.wasm",
+        "wasm_url": "https://github.com/neuronpool-technologies/neuronpool/raw/main/.dfx/ic/canisters/neuronpool/neuronpool.wasm",
         "init_guide": "dfx deps pull"
       }
     }

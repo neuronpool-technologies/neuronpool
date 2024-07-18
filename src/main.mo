@@ -181,6 +181,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return Operations.getOperationHistory(_operationHistory, start, length);
     };
 
+    public query func get_staker_history({ staker : Text }) : async [T.Operation] {
+        return Operations.getStakerHistory(_operationHistory, Principal.fromText(staker));
+    };
+
     public query func get_reward_distributions() : async [T.Operation] {
         return Operations.getRewardDistributions(_operationHistory);
     };
@@ -406,6 +410,23 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     /// Controller Private Functions ///
     ////////////////////////////////////
 
+    private func addStakeDonation(from : ?Principal, amount_e8s : Nat64) : async T.OperationResponse {
+        // Refresh the neuron to show the new balance
+        ignore refreshMainNeuron();
+
+        // Log the amount to update the TVL
+        return #ok(
+            Operations.logOperation(
+                _operationHistory,
+                #StakeDonation({
+                    from = from;
+                    amount_e8s = amount_e8s;
+                    blockchain_fee = ICP_PROTOCOL_FEE;
+                }),
+            )
+        );
+    };
+
     private func stakeMainNeuron(amount_e8s : Nat64) : async T.OperationResponse {
         if (Operations.assertMainNeuronStaked(_operationHistory)) return #err("Main neuron has already been staked");
 
@@ -509,23 +530,6 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             neuronIds = neuronIds;
             readable = readable;
         });
-    };
-
-    private func addStakeDonation(from : ?Principal, amount_e8s : Nat64) : async T.OperationResponse {
-        // Refresh the neuron to show the new balance
-        ignore refreshMainNeuron();
-
-        // Log the amount to update the TVL
-        return #ok(
-            Operations.logOperation(
-                _operationHistory,
-                #StakeDonation({
-                    from = from;
-                    amount_e8s = amount_e8s;
-                    blockchain_fee = ICP_PROTOCOL_FEE;
-                }),
-            )
-        );
     };
 
     private func spawnPrizeReward() : async () {

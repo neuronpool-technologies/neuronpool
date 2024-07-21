@@ -39,7 +39,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     // 1.06 ICP in e8s
     let MINIMUM_SPAWN : Nat64 = 106_000_000;
 
-    // // The refresh rate of checking if rewards are ready to spawn
+    // The refresh rate of checking if rewards are ready to spawn
     let SPAWN_REWARD_TIMER_DURATION_NANOS : Nat64 = (14 * 24 * 60 * 60 * 1_000_000_000); // 14 days
 
     // The canister controlled neuron will follow this neuron on all votes
@@ -352,16 +352,16 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
         switch (await neuron.getInformation()) {
             case (#ok { cached_neuron_stake_e8s }) {
-                if (cached_neuron_stake_e8s <= ICP_PROTOCOL_FEE) return #err("Insufficient amount to disburse");
-
                 let protocol_fee : Nat64 = (cached_neuron_stake_e8s * PROTOCOL_FEE_PERCENTAGE) / 100;
 
+                let protocol_and_blockchain_fee : Nat64 = protocol_fee + ICP_PROTOCOL_FEE;
+    
                 // disburse the protocol fee to the canister
                 let disburseFeeResult = await neuron.disburse({
                     to_account = ?{
                         hash = Principal.fromActor(thisCanister) |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
                     };
-                    amount = ?{ e8s = protocol_fee };
+                    amount = ?{ e8s = protocol_and_blockchain_fee };
                 });
 
                 switch (disburseFeeResult) {
@@ -383,8 +383,8 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                                         #DisburseReward({
                                             winner = caller;
                                             neuron_id = neuronId;
-                                            amount = cached_neuron_stake_e8s - protocol_fee;
-                                            protocol_fee = protocol_fee;
+                                            amount = (cached_neuron_stake_e8s - protocol_and_blockchain_fee) - ICP_PROTOCOL_FEE; // deduct fees
+                                            protocol_fee = protocol_fee; // blockchain fee will be deducted so this is the accurate amount
                                         }),
                                     )
                                 );

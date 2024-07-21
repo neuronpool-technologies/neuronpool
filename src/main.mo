@@ -147,7 +147,6 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return await setMainNeuronFollowing(topic);
     };
 
-    // This function is currently not an ICRC2 transfer_from function.
     // The exposure of the ICP address of the main neuron allows anyone to add ICP to the main neuron, but we would have no way to reflect that in the TVL without this function.
     // Stake donations exist because we may want to boost the APY of the neuron on behalf of all real users.
     // Stake donations and the initial neuron staking amount are ignored when picking a winner to avoid affecting the running sum.
@@ -355,7 +354,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                 let protocol_fee : Nat64 = (cached_neuron_stake_e8s * PROTOCOL_FEE_PERCENTAGE) / 100;
 
                 let protocol_and_blockchain_fee : Nat64 = protocol_fee + ICP_PROTOCOL_FEE;
-    
+
                 // disburse the protocol fee to the canister
                 let disburseFeeResult = await neuron.disburse({
                     to_account = ?{
@@ -409,6 +408,23 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     ////////////////////////////////////
     /// Controller Private Functions ///
     ////////////////////////////////////
+
+    private func setSpawnRewardTimer<system>() : T.OperationResponse {
+        let oldTimer = Operations.getLatestRewardTimer(_operationHistory);
+
+        // safety cancel
+        switch (oldTimer) {
+            case (?{ timer_id }) { Timer.cancelTimer(timer_id) };
+            case _ {};
+        };
+
+        let newTimerId = Timer.recurringTimer<system>(
+            #nanoseconds(Nat64.toNat(SPAWN_REWARD_TIMER_DURATION_NANOS)),
+            spawnPrizeReward,
+        );
+
+        return #ok(Operations.logOperation(_operationHistory, #RewardTimer({ timer_id = newTimerId; timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS })));
+    };
 
     private func addStakeDonation(from : ?Principal, amount_e8s : Nat64) : async T.OperationResponse {
         // Refresh the neuron to show the new balance
@@ -561,23 +577,6 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             };
             case (#err error) { return };
         };
-    };
-
-    private func setSpawnRewardTimer<system>() : T.OperationResponse {
-        let oldTimer = Operations.getLatestRewardTimer(_operationHistory);
-
-        // safety cancel
-        switch (oldTimer) {
-            case (?{ timer_id }) { Timer.cancelTimer(timer_id) };
-            case _ {};
-        };
-
-        let newTimerId = Timer.recurringTimer<system>(
-            #nanoseconds(Nat64.toNat(SPAWN_REWARD_TIMER_DURATION_NANOS)),
-            spawnPrizeReward,
-        );
-
-        return #ok(Operations.logOperation(_operationHistory, #RewardTimer({ timer_id = newTimerId; timer_duration_nanos = SPAWN_REWARD_TIMER_DURATION_NANOS })));
     };
 
 };

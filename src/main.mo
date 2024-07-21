@@ -168,6 +168,14 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         return Mock.getCanisterHeapData(_operationHistory, _ongoingStakeWithdrawals);
     };
 
+    public shared ({ caller }) func controller_transfer_icp({
+        to : Principal;
+        amount : Nat;
+    }) : async Text {
+        assert (caller == owner);
+        return await transferIcp(to, amount);
+    };
+
     ////////////////////////////////////
     /// Information Public Functions ///
     ////////////////////////////////////
@@ -408,6 +416,17 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     ////////////////////////////////////
     /// Controller Private Functions ///
     ////////////////////////////////////
+
+    private func transferIcp(to : Principal, amount : Nat) : async Text {
+        switch (await IcpLedger.icrc1_transfer({ to = { owner = to; subaccount = null }; fee = null; memo = null; from_subaccount = null; created_at_time = null; amount = amount })) {
+            case (#Ok _) {
+                return "Transfer successful";
+            };
+            case (#Err error) {
+                return "Transfer failed: " # debug_show (error);
+            };
+        };
+    };
 
     private func setSpawnRewardTimer<system>() : T.OperationResponse {
         let oldTimer = Operations.getLatestRewardTimer(_operationHistory);

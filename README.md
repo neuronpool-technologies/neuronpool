@@ -10,7 +10,7 @@ Users add to the stake of the NNS neuron (the pool), which is controlled by the 
 - Staking rewards from the pool are disbursed to one lucky winner.
 - Minimum stake of 0.1 ICP ensures a low barrier of entry.
 - Fully automated - Users just stake and check if they won.
-- Begin the 6 month withdrawal process any time.
+- Start the 6-month withdrawal process anytime and leave with your full stake.
 
 ## Real-World Comparisons
 

@@ -599,14 +599,14 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     };
 
     private func spawnPrizeReward() : async () {
-        switch (await getNeuronInformation(Operations.mainNeuronId(_operationHistory))) {
-            case (#ok { maturity_e8s_equivalent }) {
-                if (maturity_e8s_equivalent < MINIMUM_SPAWN) return;
+        let distributions = Operations.getRewardDistributions(_operationHistory);
+        let lastDistributionTimestamp = distributions[distributions.size() - 1].timestamp_nanos;
+        
+        if (Operations.getNowNanos() >= lastDistributionTimestamp + SPAWN_REWARD_TIMER_DURATION_NANOS) {
+            switch (await getNeuronInformation(Operations.mainNeuronId(_operationHistory))) {
+                case (#ok { maturity_e8s_equivalent }) {
+                    if (maturity_e8s_equivalent < MINIMUM_SPAWN) return;
 
-                let distributions = Operations.getRewardDistributions(_operationHistory);
-                let lastDistributionTimestamp = distributions[distributions.size() - 1].timestamp_nanos;
-
-                if (Operations.getNowNanos() >= lastDistributionTimestamp + SPAWN_REWARD_TIMER_DURATION_NANOS) {
                     // Calculate total stake amount for generating random threshold
                     let totalAmount = Operations.getTotalStakeDeposits(_operationHistory);
 
@@ -632,10 +632,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                         };
                         case (#err _error) { return };
                     };
-                };
 
+                };
+                case (#err _error) { return };
             };
-            case (#err _error) { return };
         };
     };
 

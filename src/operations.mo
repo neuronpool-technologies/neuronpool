@@ -17,11 +17,15 @@ module {
             history,
             {
                 action = action;
-                timestamp_nanos = Time.now() |> Int.abs(_) |> Nat64.fromNat(_);
+                timestamp_nanos = getNowNanos();
             },
         );
 
         return Vector.size(history);
+    };
+
+    public func getNowNanos() : Nat64 {
+        return Time.now() |> Int.abs(_) |> Nat64.fromNat(_);
     };
 
     public func mainNeuronId(history : T.OperationHistory) : T.NeuronId {

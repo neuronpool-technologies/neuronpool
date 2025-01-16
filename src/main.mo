@@ -39,8 +39,11 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     // 1.06 ICP in e8s
     let MINIMUM_SPAWN : Nat64 = 106_000_000;
 
-    // The refresh rate of checking if rewards are ready to spawn
+    // The minimum amount of time needed for rewards to be spawned
     let SPAWN_REWARD_TIMER_DURATION_NANOS : Nat64 = (14 * 24 * 60 * 60 * 1_000_000_000); // 14 days
+
+    // The refresh rate of checking if rewards are ready to spawn
+    let REWARD_CHECKER_DURATION : Nat64 = 24 * 60 * 60 * 1_000_000_000; // 1 day
 
     // The canister controlled neuron will follow this neuron on all votes
     let DEFAULT_NEURON_FOLLOWEE : T.NeuronId = 6914974521667616512; // Rakeoff.io named neuron
@@ -287,10 +290,12 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
         if (balance >= amount_e8s) {
             let neuron = NNS.Neuron({
                 nns_canister_id = Principal.fromActor(IcpGovernance);
-                neuron_id = Operations.mainNeuronId(_operationHistory);
+                neuron_id_or_subaccount = #NeuronId({
+                    id = Operations.mainNeuronId(_operationHistory);
+                });
             });
 
-            switch (await neuron.split({ amount_e8s = amount_e8s })) {
+            switch (await* neuron.split({ amount_e8s = amount_e8s })) {
                 case (#ok createdNeuronId) {
                     ignore refreshMainNeuron();
 
@@ -327,10 +332,17 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
         let neuron = NNS.Neuron({
             nns_canister_id = Principal.fromActor(IcpGovernance);
-            neuron_id = neuronId;
+            neuron_id_or_subaccount = #NeuronId({ id = neuronId });
         });
 
-        return await neuron.startDissolving();
+        switch (await* neuron.startDissolving()) {
+            case (#ok) {
+                return #ok();
+            };
+            case (#err(err)) {
+                return #err(debug_show err);
+            };
+        };
     };
 
     private func processIcpStakeDisburse(caller : Principal, neuronId : T.NeuronId) : async T.ConfigureResponse {
@@ -338,15 +350,17 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
         let neuron = NNS.Neuron({
             nns_canister_id = Principal.fromActor(IcpGovernance);
-            neuron_id = neuronId;
+            neuron_id_or_subaccount = #NeuronId({ id = neuronId });
         });
 
-        return await neuron.disburse({
-            to_account = ?{
-                hash = AccountIdentifier.accountIdentifier(caller, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
+        switch (await* neuron.disburse({ to_account = ?{ hash = AccountIdentifier.accountIdentifier(caller, AccountIdentifier.defaultSubaccount()) }; amount = null })) {
+            case (#ok) {
+                return #ok();
             };
-            amount = null;
-        });
+            case (#err(err)) {
+                return #err(debug_show err);
+            };
+        };
     };
 
     private func processIcpPrizeDisburse(caller : Principal, neuronId : T.NeuronId) : async T.OperationResponse {
@@ -354,19 +368,19 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
         let neuron = NNS.Neuron({
             nns_canister_id = Principal.fromActor(IcpGovernance);
-            neuron_id = neuronId;
+            neuron_id_or_subaccount = #NeuronId({ id = neuronId });
         });
 
-        switch (await neuron.getInformation()) {
+        switch (await* neuron.getInformation()) {
             case (#ok { cached_neuron_stake_e8s }) {
                 let protocol_fee : Nat64 = (cached_neuron_stake_e8s * PROTOCOL_FEE_PERCENTAGE) / 100;
 
                 let protocol_and_blockchain_fee : Nat64 = protocol_fee + ICP_PROTOCOL_FEE;
 
-                // disburse the protocol fee to the canister
-                let disburseFeeResult = await neuron.disburse({
+                // disburse the protocol fee to the fee account
+                let disburseFeeResult = await* neuron.disburse({
                     to_account = ?{
-                        hash = Principal.fromActor(thisCanister) |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
+                        hash = Principal.fromText("jv4ws-fbili-a35rv-xd7a5-xwvxw-trink-oluun-g7bcp-oq5f6-35cba-vqe") |> AccountIdentifier.accountIdentifier(_, AccountIdentifier.defaultSubaccount());
                     };
                     amount = ?{ e8s = protocol_and_blockchain_fee };
                 });
@@ -374,9 +388,9 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
                 switch (disburseFeeResult) {
                     case (#ok _) {
                         // disburse the rest of the neuron amount to the winner
-                        let disburseWinnerResult = await neuron.disburse({
+                        let disburseWinnerResult = await* neuron.disburse({
                             to_account = ?{
-                                hash = AccountIdentifier.accountIdentifier(caller, AccountIdentifier.defaultSubaccount()) |> Blob.toArray(_);
+                                hash = AccountIdentifier.accountIdentifier(caller, AccountIdentifier.defaultSubaccount());
                             };
                             amount = null; // defaults to 100% of what's left
                         });
@@ -471,7 +485,7 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             icp_ledger_canister_id = Principal.fromActor(IcpLedger);
         });
 
-        switch (await nns.stake({ amount_e8s = amount_e8s })) {
+        switch (await* nns.stake({ amount_e8s = amount_e8s })) {
             case (#ok neuronId) {
                 // store the staked neuron in the log
                 return #ok(Operations.logOperation(_operationHistory, #CreateNeuron({ neuron_id = neuronId; token = "ICP"; amount_e8s = ONE_ICP })));
@@ -489,12 +503,19 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
 
                 let neuron = NNS.Neuron({
                     nns_canister_id = Principal.fromActor(IcpGovernance);
-                    neuron_id = Operations.mainNeuronId(_operationHistory);
+                    neuron_id_or_subaccount = #NeuronId({
+                        id = Operations.mainNeuronId(_operationHistory);
+                    });
                 });
 
-                return await neuron.increaseDissolveDelay({
-                    additional_dissolve_delay_seconds = NEURON_DISSOLVE_DELAY_SECONDS;
-                });
+                switch (await* neuron.increaseDissolveDelay({ additional_dissolve_delay_seconds = NEURON_DISSOLVE_DELAY_SECONDS })) {
+                    case (#ok) {
+                        return #ok();
+                    };
+                    case (#err(err)) {
+                        return #err(debug_show err);
+                    };
+                };
             };
             case (#err error) {
                 return #err(debug_show error);
@@ -505,22 +526,30 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     private func setMainNeuronFollowing(topic : Int32) : async T.ConfigureResponse {
         let neuron = NNS.Neuron({
             nns_canister_id = Principal.fromActor(IcpGovernance);
-            neuron_id = Operations.mainNeuronId(_operationHistory);
+            neuron_id_or_subaccount = #NeuronId({
+                id = Operations.mainNeuronId(_operationHistory);
+            });
         });
 
-        return await neuron.follow({
-            topic = topic;
-            followee = DEFAULT_NEURON_FOLLOWEE;
-        });
+        switch (await* neuron.follow({ topic = topic; followee = DEFAULT_NEURON_FOLLOWEE })) {
+            case (#ok) {
+                return #ok();
+            };
+            case (#err(err)) {
+                return #err(debug_show err);
+            };
+        };
     };
 
     private func refreshMainNeuron() : async () {
         let neuron = NNS.Neuron({
             nns_canister_id = Principal.fromActor(IcpGovernance);
-            neuron_id = Operations.mainNeuronId(_operationHistory);
+            neuron_id_or_subaccount = #NeuronId({
+                id = Operations.mainNeuronId(_operationHistory);
+            });
         });
 
-        ignore await neuron.refresh();
+        ignore await* neuron.refresh();
     };
 
     //////////////////////////////////
@@ -548,10 +577,10 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
     private func getNeuronInformation(neuronId : T.NeuronId) : async NeuroTypes.NnsInformationResult {
         let neuron = NNS.Neuron({
             nns_canister_id = Principal.fromActor(IcpGovernance);
-            neuron_id = neuronId;
+            neuron_id_or_subaccount = #NeuronId({ id = neuronId });
         });
 
-        return await neuron.getInformation();
+        return await* neuron.getInformation();
     };
 
     private func listNeuronInformation(neuronIds : [T.NeuronId], readable : Bool) : async NeuroTypes.NnsListNeuronsResponse {
@@ -561,9 +590,11 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             icp_ledger_canister_id = Principal.fromActor(IcpLedger);
         });
 
-        return await nns.listNeurons({
-            neuronIds = neuronIds;
-            readable = readable;
+        return await* nns.listNeurons({
+            include_empty = true;
+            include_public = true;
+            include_readable = readable;
+            neuron_ids = neuronIds;
         });
     };
 
@@ -572,30 +603,45 @@ shared ({ caller = owner }) actor class NeuronPool() = thisCanister {
             case (#ok { maturity_e8s_equivalent }) {
                 if (maturity_e8s_equivalent < MINIMUM_SPAWN) return;
 
-                // Calculate total stake amount for generating random threshold
-                let totalAmount = Operations.getTotalStakeDeposits(_operationHistory);
+                let distributions = Operations.getRewardDistributions(_operationHistory);
+                let lastDistributionTimestamp = distributions[distributions.size() - 1].timestamp_nanos;
 
-                let ?randomNumber = await Prize.generateRandomThreshold(totalAmount) else return;
+                if (Operations.getNowNanos() >= lastDistributionTimestamp + SPAWN_REWARD_TIMER_DURATION_NANOS) {
+                    // Calculate total stake amount for generating random threshold
+                    let totalAmount = Operations.getTotalStakeDeposits(_operationHistory);
 
-                let ?winner = Prize.weightedSelection(_operationHistory, randomNumber) else return;
+                    let ?randomNumber = await Prize.generateRandomThreshold(totalAmount) else return;
 
-                // the neuron is controlled by the canister
-                let neuron = NNS.Neuron({
-                    nns_canister_id = Principal.fromActor(IcpGovernance);
-                    neuron_id = Operations.mainNeuronId(_operationHistory);
-                });
+                    let ?winner = Prize.weightedSelection(_operationHistory, randomNumber) else return;
 
-                switch (await neuron.spawn({ new_controller = null; percentage_to_spawn = null })) {
-                    case (#ok createdNeuronId) {
-                        // store the staked neuron in the log
-                        return ignore Operations.logOperation(_operationHistory, #SpawnReward({ winner = winner; neuron_id = createdNeuronId; maturity_e8s = maturity_e8s_equivalent }));
+                    // the neuron is controlled by the canister
+                    let neuron = NNS.Neuron({
+                        nns_canister_id = Principal.fromActor(IcpGovernance);
+                        neuron_id_or_subaccount = #NeuronId({
+                            id = Operations.mainNeuronId(_operationHistory);
+                        });
+                    });
+
+                    // try refesh voting power
+                    ignore await* neuron.refreshVotingPower();
+
+                    switch (await* neuron.spawn({ new_controller = null; percentage_to_spawn = null; nonce = null })) {
+                        case (#ok createdNeuronId) {
+                            // store the staked neuron in the log
+                            return ignore Operations.logOperation(_operationHistory, #SpawnReward({ winner = winner; neuron_id = createdNeuronId; maturity_e8s = maturity_e8s_equivalent }));
+                        };
+                        case (#err _error) { return };
                     };
-                    case (#err error) { return };
                 };
 
             };
-            case (#err error) { return };
+            case (#err _error) { return };
         };
     };
+
+    ignore Timer.recurringTimer<system>(
+        #nanoseconds(Nat64.toNat(REWARD_CHECKER_DURATION)),
+        spawnPrizeReward,
+    );
 
 };

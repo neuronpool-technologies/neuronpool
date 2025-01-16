@@ -10,7 +10,7 @@ module {
 
     public type OperationResponse = Result<OperationIndex, Text>;
 
-    public type ConfigureResponse = NeuroTypes.ConfigureResult;
+    public type ConfigureResponse = Result<(), Text>;
 
     public type HistoryResult = Result<History, ()>;
 
